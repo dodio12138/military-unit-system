@@ -79,7 +79,7 @@ function rankMark(rank) {
   const count = dots ?? bars ?? crosses ?? 0;
   const width = Math.max(32, 9 * count);
   const marks = Array.from({ length: count }, (_, index) => {
-    const x = width / 2 + (index - (count - 1) / 2) * (crosses ? 9 : 6);
+    const x = width / 2 + (index - (count - 1) / 2) * (crosses ? 9 : dots ? 10 : 6);
     if (dots) return `<circle cx="${x}" cy="8" r="1.8" fill="currentColor"/>`;
     if (bars) return `<path d="M${x} 4v8"/>`;
     return `<path d="m${x - 3} 5 6 6m0-6-6 6"/>`;
