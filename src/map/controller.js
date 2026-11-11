@@ -12,6 +12,8 @@ try { stored = JSON.parse(localStorage.getItem(activeStorageKey)) ?? {}; } catch
 let model = new CommandMapModel(scenario,stored);
 let visibleIds = [];
 let visibleExpanded = new Set();
+let reachableIds = [];
+let detailRoot = null, detailSignature = '';
 let autoDetail = stored.autoDetail !== false;
 const zoomCollapsed = new Set(Array.isArray(stored.zoomCollapsed)?stored.zoomCollapsed.filter(id=>model.units.has(id)):[]);
 const tiles = new CommandMapTiles($("map-tiles"),$("map-tile-status"),$("map-basemap-attribution"),stored.basemap);
@@ -102,7 +104,15 @@ function applyCamera(refresh=true) {
 }
 function zoom(factor,x=svg.clientWidth/2,y=svg.clientHeight/2) {
   const next=Math.max(.04,Math.min(8192,camera.scale*factor));const ratio=next/camera.scale;
+  if(next===camera.scale)return;
+  // A manual fold lasts until the next zoom. Expansion locks remain persistent.
+  if(autoDetail)for(const id of zoomCollapsed)if(!model.locked(id))zoomCollapsed.delete(id);
+  const nearby=visibleIds.filter(id=>model.children.has(id)).map(id=>{
+    const p=mapProjection.project(model.position(id));return {id,distance:Math.hypot(p.x*camera.scale+camera.x-x,p.y*camera.scale+camera.y-y)};
+  }).filter(item=>item.distance<220).sort((a,b)=>a.distance-b.distance);
+  if(nearby.length)detailRoot=nearby[0].id;
   camera.x=x-(x-camera.x)*ratio;camera.y=y-(y-camera.y)*ratio;camera.scale=next;applyCamera();clearTimeout(saveTimer);saveTimer=setTimeout(save,200);
+  renderZoomDetail();
 }
 function screenGeo(clientX,clientY) {const rect=svg.getBoundingClientRect();return mapProjection.invert({x:(clientX-rect.left-camera.x)/camera.scale,y:(clientY-rect.top-camera.y)/camera.scale});}
 function renderGeography() {
@@ -149,15 +159,15 @@ function renderMarkers() {
 }
 function render() {
   const focused=document.activeElement?.closest('[data-unit]')?.dataset.unit;
-  const visibility=mapVisibility();visibleIds=visibility.ids;visibleExpanded=visibility.expanded;$("map-auto-detail").checked=autoDetail;$("map-basemap").value=tiles.provider;$("map-side").value=model.side;$("map-links").checked=model.showLinks;
+  const visibility=mapVisibility();visibleIds=visibility.ids;visibleExpanded=visibility.expanded;reachableIds=visibility.reachableIds;$("map-auto-detail").checked=autoDetail;$("map-basemap").value=tiles.provider;$("map-side").value=model.side;$("map-links").checked=model.showLinks;
   $("map-focus").hidden=!model.focus;$("map-focus-name").textContent=model.units.get(model.focus)?.name ?? '';
   $("map-status").textContent=`显示 ${number(visibleIds.length)} / ${number(model.units.size)} 个单位 · ${deploymentMode==="history"?"真实番号 · 参考点与待定位":"虚构基层示例"}${visibility.limited?' · 请继续放大查看局部':''}`;
-  renderLinks();renderMarkers();renderInspector();renderHistoryCatalog();
+  renderLinks();renderMarkers();renderInspector();renderHistoryCatalog();renderZoomDetail();
   if(focused){const node=[...$("map-markers").children].find(item=>item.dataset.unit===focused);node?.focus({preventScroll:true});}
 }
-function select(id) {model.selected=id;render();save();}
+function select(id) {model.selected=id;if(model.children.has(id))detailRoot=id;render();save();}
 function showBranch(id) {
-  model.selected=id;model.focus=id;if(!model.locked(id)){zoomCollapsed.delete(id);model.expanded.add(id);}
+  model.selected=id;model.focus=id;detailRoot=id;if(!model.locked(id)){zoomCollapsed.delete(id);model.expanded.add(id);}
   model.side=model.units.get(id).side;render();fit([id,...model.descendants(id)]);save();
 }
 function locate(id) {
@@ -203,9 +213,40 @@ function setExpansionLock(id,locked) {
 }
 function toggle(id) {
   if(model.locked(id) || !model.children.has(id)){say('该单位已锁定，或已经是最基层单位');return;}
+  detailRoot=id;
   if(isExpanded(id)){zoomCollapsed.add(id);model.expanded.delete(id);catalogExpanded.delete(id);}
   else {zoomCollapsed.delete(id);model.expanded.add(id);catalogExpanded.add(id);}
   render();save();
+}
+
+function renderZoomDetail() {
+  const panel=$("map-zoom-detail");
+  const root=model.units.get(detailRoot);
+  const rows=root?mapZoomPendingBranch(model,root.id,visibleExpanded):[];
+  const pending=rows.filter(row=>row.pending).length;
+  const inScope=root&&(model.side==='both'||root.side===model.side)&&reachableIds.includes(root.id);
+  panel.hidden=!inScope||!visibleExpanded.has(root?.id)||!pending;
+  if(panel.hidden){detailSignature='';return;}
+  const signature=JSON.stringify([root.id,rows,model.selected,autoDetail,[...visibleExpanded]]);
+  if(signature===detailSignature)return;detailSignature=signature;
+  panel.replaceChildren();
+  const heading=html('header','map-detail-heading');
+  heading.append(html('strong','',representation(root.id).name),html('small','',`展开编制 · ${pending} 个待定位`));
+  const dismiss=button('收起',()=>{detailRoot=null;renderZoomDetail();},'map-detail-dismiss');dismiss.setAttribute('aria-label','收起待定位编制');heading.append(dismiss);
+  panel.append(heading,html('p','map-detail-caption',`下方仅表示隶属，非地图位置；${autoDetail?'继续放大逐层展开。':'双击兵牌展开下级。'}`));
+  const list=html('ul','map-detail-tree');panel.append(list);const containers=new Map([[root.id,list]]);
+  for(const row of rows){
+    const unit=model.units.get(row.id),shown=representation(row.id);
+    const item=html('li'),control=button('',()=>select(row.id),'map-detail-unit');control.replaceChildren();
+    control.dataset.detailUnit=row.id;control.dataset.pending=String(row.pending);control.setAttribute('aria-pressed',String(model.selected===row.id));
+    const icon=element('svg',{viewBox:'-27 -32 54 51',width:40,height:38,class:`map-marker ${unit.side}`,'aria-hidden':'true'});
+    icon.innerHTML=symbol(shown.type)+rankMark(unit.rank);
+    const plate=icon.querySelector('.unit-symbol');for(const [key,value]of Object.entries({x:-22,y:-14,width:44,height:28}))plate.setAttribute(key,value);
+    const rank=icon.querySelector('.rank-mark');for(const [key,value]of Object.entries({x:-18,y:-29,width:36,height:12}))rank.setAttribute(key,value);
+    const label=html('span','');label.append(html('span','',shown.name),html('small','',`${mapRankName(unit)} · ${row.pending?'待定位':'地图有参考点'}`));
+    control.append(icon,label);control.title='点击查看资料，双击展开或折叠下级';control.addEventListener('dblclick',()=>toggle(row.id));item.append(control);
+    (containers.get(row.parent)??list).append(item);const children=html('ul');item.append(children);containers.set(row.id,children);
+  }
 }
 
 function hideTooltip() {$("map-tooltip").hidden=true;}
@@ -277,18 +318,18 @@ $("map-context").addEventListener('click',event=>{const action=event.target.data
 document.addEventListener('pointerdown',event=>{if(!$("map-context").contains(event.target))$("map-context").hidden=true;});
 document.addEventListener('keydown',event=>{if(event.target.closest('input,textarea,select,button,a,summary'))return;if(event.code==='Space'){spaceHeld=true;event.preventDefault();}if(event.key==='Escape'){hideTooltip();$("map-context").hidden=true;}const id=event.target.closest('[data-unit]')?.dataset.unit;if(id&&(event.key==='Enter'||event.key===' ')){event.preventDefault();select(id);if(event.key==='Enter')toggle(id);}});
 document.addEventListener('keyup',event=>{if(event.code==='Space')spaceHeld=false;});window.addEventListener('blur',()=>{spaceHeld=false;});
-$("map-expand").addEventListener('click',()=>{for(const id of visibleIds)if(!model.locked(id)&&model.children.has(id)&&!visibleExpanded.has(id)){zoomCollapsed.delete(id);model.expanded.add(id);}render();save();});
-$("map-collapse").addEventListener('click',()=>{const deepest=visibleIds.filter(id=>visibleExpanded.has(id)&&!model.locked(id)&&!(model.children.get(id)??[]).some(child=>visibleExpanded.has(child)));for(const id of deepest){model.expanded.delete(id);zoomCollapsed.add(id);}render();save();});
+$("map-expand").addEventListener('click',()=>{for(const id of reachableIds)if(!model.locked(id)&&model.children.has(id)&&!visibleExpanded.has(id)){zoomCollapsed.delete(id);model.expanded.add(id);}render();save();});
+$("map-collapse").addEventListener('click',()=>{const deepest=reachableIds.filter(id=>visibleExpanded.has(id)&&!model.locked(id)&&!(model.children.get(id)??[]).some(child=>visibleExpanded.has(child)));for(const id of deepest){model.expanded.delete(id);zoomCollapsed.add(id);}render();save();});
 $("map-fullscreen-tools").addEventListener("click",event=>{const target=event.target.closest("[data-map-control]")?.dataset.mapControl;if(target)$(target)?.click();});
 $("map-borders").addEventListener('change',event=>{showBorders=event.target.checked;renderGeography();save();});
 $("map-territories-toggle").addEventListener('change',event=>{showTerritories=event.target.checked;renderGeography();save();});
 $("map-edit-deployment").addEventListener('change',()=>{renderInspector();svg.classList.toggle('editing-deployment',$("map-edit-deployment").checked);});
 $("map-basemap").addEventListener('change',event=>{tiles.setProvider(event.target.value);applyCamera();save();});
-$("map-auto-detail").addEventListener('change',event=>{autoDetail=event.target.checked;render();save();});
+$("map-auto-detail").addEventListener('change',event=>{autoDetail=event.target.checked;if(autoDetail)for(const id of zoomCollapsed)if(!model.locked(id))zoomCollapsed.delete(id);render();save();});
 $("map-side").addEventListener('change',event=>{model.side=event.target.value;model.focus=null;render();fit();save();});
 $("map-links").addEventListener('change',event=>{model.showLinks=event.target.checked;renderLinks();save();});
 $("map-fit").addEventListener('click',()=>fit());
-$("map-overview").addEventListener('click',()=>{model.focus=null;render();fit(visibleIds,true);save();});
+$("map-overview").addEventListener('click',()=>{model.focus=null;detailRoot=null;render();fit(visibleIds,true);save();});
 $("map-exit-focus").addEventListener('click',()=>{model.focus=null;render();fit();save();});
 $("map-zoom-in").addEventListener('click',()=>zoom(1.5));$("map-zoom-out").addEventListener('click',()=>zoom(1/1.5));
 $("map-undo").addEventListener('click',()=>{if(!history.length)return;model=new CommandMapModel(scenario,history.pop());$("map-undo").disabled=!history.length;render();save();});

@@ -33,7 +33,8 @@ test('production zoom keeps geographic point beneath cursor and never modifies u
   const source=fs.readFileSync('src/map/controller.js','utf8');
   const start=source.indexOf('function zoom('),end=source.indexOf('\nfunction screenGeo',start);
   assert.ok(start>=0&&end>start);
-  const context=vm.createContext({camera:{x:-500,y:-1000,scale:.7},svg:{clientWidth:1200,clientHeight:800},applyCamera(){},clearTimeout(){},setTimeout(){},save(){},saveTimer:null});
+  const positions={sample:{lon:21.01,lat:52.23}};
+  const context=vm.createContext({camera:{x:-500,y:-1000,scale:.7},svg:{clientWidth:1200,clientHeight:800},autoDetail:true,zoomCollapsed:new Set(['manual','locked']),visibleIds:[],model:{positions,locked:id=>id==='locked'},renderZoomDetail(){},applyCamera(){},clearTimeout(){},setTimeout(){},save(){},saveTimer:null});
   vm.runInContext(source.slice(start,end),context);
   for(const factor of [1.5,.66,100,.001,1e8]) {
     const before={...context.camera},cursor={x:324,y:217};
@@ -42,6 +43,10 @@ test('production zoom keeps geographic point beneath cursor and never modifies u
     close(p.x*context.camera.scale+context.camera.x,cursor.x);
     close(p.y*context.camera.scale+context.camera.y,cursor.y);
   }
+  assert.deepEqual([...context.zoomCollapsed],['locked'],'zoom clears temporary folds but preserves locks');
+  assert.deepEqual(positions,{sample:{lon:21.01,lat:52.23}});
+  context.autoDetail=false;context.zoomCollapsed.add('manual');context.zoom(.5);
+  assert.ok(context.zoomCollapsed.has('manual'),'manual mode must retain explicit folds');
 });
 
 test('tile renderer lays out cached and new images in screen pixels at every camera update',()=>{

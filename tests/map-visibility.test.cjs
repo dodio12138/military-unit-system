@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const {CommandMapModel, polandScenario, mapVisibleAtZoom} = vm.runInNewContext(
-  ['src/data/poland-1939.js','src/map/model.js','src/map/visibility.js'].map(p=>fs.readFileSync(p,'utf8')).join('\n') + '\n({CommandMapModel,polandScenario,mapVisibleAtZoom})', {structuredClone});
+const {CommandMapModel, polandScenario, mapVisibleAtZoom, mapZoomPendingBranch} = vm.runInNewContext(
+  ['src/data/poland-1939.js','src/map/model.js','src/map/visibility.js'].map(p=>fs.readFileSync(p,'utf8')).join('\n') + '\n({CommandMapModel,polandScenario,mapVisibleAtZoom,mapZoomPendingBranch})', {structuredClone});
 const world = {west:12,east:27,south:48,north:56};
 const run = (model, zoom, extra={}) => mapVisibleAtZoom(model,{zoom,...world,...extra});
 
@@ -38,4 +38,17 @@ test('limit preserves selected reachable chain and marks truncation',()=>{
   const result=run(m,17,{limit:12});
   assert.ok(result.limited); assert.ok(result.ids.length<=12); assert.ok(result.ids.includes(m.selected));
   for(const id of m.ancestors(m.selected)) assert.ok(result.ids.includes(id));
+});
+
+
+test('pending branch uses logical expansion, respects faction and never changes positions',()=>{
+  const m=new CommandMapModel(polandScenario); m.focus='de-3';
+  const view=run(m,9); const before=JSON.stringify(m.snapshot());
+  const rows=mapZoomPendingBranch(m,'de-3',view.expanded);
+  assert.ok(rows.some(row=>row.id==='de-3-sample' && row.depth===1 && !row.pending));
+  assert.ok(!rows.some(row=>row.id==='de-3-sample-r1'));
+  assert.ok(view.reachableIds.includes('de-3-sample'));
+  assert.equal(mapZoomPendingBranch(m,'de-3',new Set()).length,0);
+  m.side='polish'; assert.equal(mapZoomPendingBranch(m,'de-3',view.expanded).length,0);
+  m.side='both'; assert.equal(JSON.stringify(m.snapshot()),before);
 });

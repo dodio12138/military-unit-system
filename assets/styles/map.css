@@ -145,4 +145,20 @@ body.map-fullscreen-open { overflow:hidden; }
 .map-fullscreen .map-fullscreen-tools { display:flex; }
 .map-fullscreen-tools button { background:var(--panel); }
 .map-fullscreen .map-focus { top:56px; }
+.map-zoom-detail { position:absolute; top:56px; left:12px; z-index:3; width:280px; max-width:calc(100% - 24px); max-height:calc(100% - 180px); overflow:auto; background:var(--panel); border:1px solid var(--line); font:12px/1.5 "PingFang SC","Microsoft YaHei",sans-serif; }
+.map-detail-heading { position:relative; display:flex; flex-direction:column; gap:3px; padding:10px 48px 10px 12px; border-bottom:1px solid var(--line); background:var(--hud-bar); }
+.map-detail-dismiss { position:absolute; top:10px; right:8px; border:0; padding:2px; background:transparent; color:var(--secondary); font:inherit; }
+.map-detail-dismiss:hover { color:var(--text); background:var(--accent-light); }
+.map-detail-heading small,.map-detail-caption,.map-detail-unit small { color:var(--secondary); font-size:11px; }
+.map-detail-caption { padding:8px 12px; margin:0; }
+.map-detail-tree,.map-detail-tree ul { list-style:none; padding:0; margin:0 8px 8px 12px; }
+.map-detail-tree ul { border-left:1px solid var(--line); margin-left:18px; margin-right:0; }
+.map-detail-tree ul:empty { display:none; }
+.map-detail-unit { position:relative; display:flex; align-items:center; gap:6px; width:100%; padding:3px 4px; border:0; text-align:left; background:transparent; color:var(--text); font:inherit; }
+.map-detail-tree ul .map-detail-unit::before { content:''; position:absolute; left:-12px; top:50%; width:12px; border-top:1px solid var(--line); }
+.map-detail-unit > svg { flex:none; }
+.map-detail-unit > span { display:flex; flex-direction:column; min-width:0; overflow-wrap:anywhere; }
+.map-detail-unit:hover,.map-detail-unit[aria-pressed="true"] { background:var(--accent-light); }
+.map-fullscreen .map-zoom-detail:has(~ .map-focus:not([hidden])) { top:96px; }
+@media(max-width:700px) { .map-zoom-detail { top:52px; width:245px; max-height:42%; } }
 @media(max-width:500px) { .map-fullscreen-tools { gap:3px; left:6px; } .map-fullscreen-tools button { padding-inline:6px; } .map-fullscreen-button { right:6px; } }

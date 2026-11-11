@@ -2,9 +2,9 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const {scenario,CommandMapModel,mapVisibleAtZoom,ranks,types}=vm.runInNewContext([
+const {scenario,CommandMapModel,mapVisibleAtZoom,mapZoomPendingBranch,ranks,types}=vm.runInNewContext([
  'src/core/config.js','src/data/presets.js','src/render/symbols.js','src/data/poland-oob-german.js','src/data/poland-oob-polish.js','src/data/poland-history.js','src/map/model.js','src/map/visibility.js'
-].map(p=>fs.readFileSync(p,'utf8')).join('\n')+'\n({scenario:polandHistoricalScenario,CommandMapModel,mapVisibleAtZoom,ranks,types})',{structuredClone});
+].map(p=>fs.readFileSync(p,'utf8')).join('\n')+'\n({scenario:polandHistoricalScenario,CommandMapModel,mapVisibleAtZoom,mapZoomPendingBranch,ranks,types})',{structuredClone});
 test('historical headquarters have explicit precision, sources and valid command categories',()=>{
  assert.ok(scenario.units.length>=500);
  const m=new CommandMapModel(scenario);
@@ -53,4 +53,34 @@ test('unknown intermediate commands preserve geographic descendants and their co
  const snapshot=JSON.stringify(m.snapshot());
  mapVisibleAtZoom(m,{zoom:18,west:18,east:20,south:50,north:52});
  assert.equal(JSON.stringify(m.snapshot()),snapshot);
+});
+
+
+test('historical zoom exposes unlocated commands and regiments in the logical branch',()=>{
+ const m=new CommandMapModel(scenario); m.focus='de-10';
+ const options={west:12,east:30,south:47,north:56};
+ const at=z=>mapVisibleAtZoom(m,{zoom:z,...options});
+ const rows=z=>mapZoomPendingBranch(m,'de-10',at(z).expanded);
+ const branch=z=>rows(z).filter(row=>row.id==='de-corps-16'||m.ancestors(row.id).includes('de-corps-16'));
+ assert.deepEqual(Array.from(branch(8),row=>row.id),['de-corps-16']);
+ assert.ok(branch(9).some(row=>m.units.get(row.id).rank==='division'));
+ assert.ok(!branch(9).some(row=>m.units.get(row.id).rank==='regiment'));
+ assert.ok(branch(10).some(row=>m.units.get(row.id).rank==='regiment'));
+ const pending=rows(10).find(row=>row.id==='de-corps-16');
+ assert.ok(pending?.pending); assert.ok(at(10).reachableIds.includes(pending.id));
+ assert.ok(!at(10).ids.includes(pending.id));
+ const p=m.position(pending.id); assert.equal(p.lon,null); assert.equal(p.lat,null);
+});
+
+test('locked historical subtree stays at saved expansion through zoom changes',()=>{
+ const m=new CommandMapModel(scenario); m.focus='de-10'; m.locks.add('de-corps-16');
+ const view=mapVisibleAtZoom(m,{zoom:18,west:12,east:30,south:47,north:56});
+ const rows=mapZoomPendingBranch(m,'de-10',view.expanded);
+ assert.ok(rows.some(row=>row.id==='de-corps-16'));
+ assert.ok(!rows.some(row=>row.parent==='de-corps-16'));
+ m.expanded.add('de-corps-16');
+ const next=mapVisibleAtZoom(m,{zoom:18,west:12,east:30,south:47,north:56});
+ const openRows=mapZoomPendingBranch(m,'de-10',next.expanded);
+ assert.ok(openRows.some(row=>row.parent==='de-corps-16'));
+ assert.ok(!openRows.some(row=>row.depth>2 && m.ancestors(row.id).includes('de-corps-16')));
 });
