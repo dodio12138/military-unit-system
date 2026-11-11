@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f6">
+  <title>兵牌编辑器 · 编制工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231c5961'/%3E%3Cpath d='M7 10h18v12H7zM7 10l18 12m0-12L7 22' stroke='%23fff' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="editor.css?v=army-chart">
+  <script src="presets.js" defer></script>
+  <script src="editor.js?v=new-fourth-army" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" id="brand-mark" aria-hidden="true"></span>
+      <span>兵牌编辑器</span>
+    </div>
+    <span class="topbar-section">编制工作台</span>
+    <div class="topbar-actions">
+      <div class="history" aria-label="编辑历史">
+        <button class="icon-button" id="undo" data-icon="undo" aria-label="撤销" title="撤销（⌘ / Ctrl + Z）"></button>
+        <button class="icon-button" id="redo" data-icon="redo" aria-label="重做" title="重做（⌘ / Ctrl + Shift + Z）"></button>
+      </div>
+      <button class="button primary" id="new-chart">新建编制</button>
+      <div class="preset-edit-actions" id="preset-edit-actions" hidden>
+        <button class="button secondary" id="exit-preset-edit">返回编制</button>
+        <button class="button primary" id="save-preset-edit">保存预设</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="workbench">
+    <main class="workspace">
+      <header class="document-head">
+        <div class="document-info">
+          <details class="chart-library" id="chart-library">
+            <summary class="section-index"><span data-icon="library"></span>编制列表<span data-icon="chevron"></span></summary>
+            <div class="library-panel">
+              <div class="library-head"><h2>本机编制</h2><span id="library-count"></span></div>
+              <div id="chart-list" class="chart-list" aria-label="已保存的编制"></div>
+            </div>
+          </details>
+          <div class="title-line">
+            <h1 id="chart-title"></h1>
+            <button class="icon-button" id="rename-chart" data-icon="pencil" aria-label="重命名编制" title="重命名编制"></button>
+            <input id="title-input" maxlength="32" aria-label="编制名称" hidden>
+          </div>
+          <p id="chart-description" class="muted"></p>
+        </div>
+        <div class="document-actions">
+          <button class="button secondary" id="arrange"><span data-icon="layout"></span>整理布局</button>
+          <button class="button secondary" id="save-image" title="下载当前编制图为 SVG"><span data-icon="download"></span>保存图片</button>
+        </div>
+      </header>
+
+      <section class="drawing" aria-label="编制画布">
+        <div class="drawing-head">
+          <div class="drawing-label"><span data-icon="diagram"></span><h2>编制图</h2></div>
+          <div class="formation-tools" aria-label="编制层级操作">
+            <button class="button secondary" id="expand-layer">展开一层</button>
+            <button class="button secondary" id="collapse-layer">叠起一层</button>
+            <button class="button secondary" id="expand-all">全部展开</button>
+            <button class="button secondary" id="stack-peers">叠放同类</button>
+          </div>
+          <div class="view-tools" aria-label="画布工具">
+            <button class="icon-button" id="select-tool" data-icon="cursor" aria-label="选择工具" title="选择工具（V）" aria-pressed="true"></button>
+            <button class="icon-button" id="pan-tool" data-icon="hand" aria-label="平移画布" title="平移画布（H，或按住空格）" aria-pressed="false"></button>
+          </div>
+        </div>
+        <div id="stage" class="stage" tabindex="0" aria-label="可编辑编制图">
+          <div id="world" class="world">
+            <svg id="connections" class="connections" aria-hidden="true"></svg>
+            <div id="units" class="units"></div>
+          </div>
+          <div id="empty" class="empty-state" hidden>
+            <div id="empty-symbol"></div>
+            <h3>放下第一枚兵牌</h3>
+            <p>从预设拖入兵牌，开始搭建编制</p>
+          </div>
+        </div>
+        <div class="drawing-foot">
+          <span id="canvas-tip" class="canvas-tip"><kbd>空格</kbd> 平移画布</span>
+          <div class="zoom" aria-label="画布缩放">
+            <button class="icon-button zoom-action" id="zoom-out">缩小</button>
+            <span id="zoom-level" aria-live="polite">100%</span>
+            <button class="icon-button zoom-action" id="zoom-in">放大</button>
+            <span class="zoom-divider"></span>
+            <button class="icon-button" id="fit" data-icon="fit" aria-label="适应画布" title="适应画布（F）"></button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="statusbar">
+        <span id="chart-stats"></span>
+        <span class="save-status" id="save-status"><span data-icon="check"></span><span id="save-text">已保存在此浏览器</span></span>
+      </footer>
+    </main>
+
+    <aside class="sidebar" aria-label="兵牌与单位属性">
+      <div class="panel-tabs" role="tablist" aria-label="编制面板">
+        <button id="preset-tab" type="button" role="tab" aria-controls="preset-panel" aria-selected="true">兵牌预设</button>
+        <button id="unit-tab" type="button" role="tab" aria-controls="unit-panel" aria-selected="false" tabindex="-1">单位属性</button>
+      </div>
+
+      <section id="preset-panel" role="tabpanel" aria-labelledby="preset-tab">
+        <div class="panel-intro">
+          <div class="preset-heading"><h2>预设库</h2><button class="button secondary" id="manage-presets"><span data-icon="library"></span>管理预设</button></div>
+          <p id="palette-hint">拖动兵牌到画布，或点击后放置</p>
+        </div>
+        <div class="palette-modes" aria-label="预设类别">
+          <button class="button" id="formation-mode" type="button" aria-pressed="true">编制预设</button>
+          <button class="button" id="symbol-mode" type="button" aria-pressed="false">兵种兵牌</button>
+          <span id="preset-count"></span>
+        </div>
+        <div id="preset-groups"></div>
+        <div class="placement-guide">
+          <h3>放置方式</h3>
+          <div><span data-icon="empty-square"></span><p><strong>放到空白处</strong><small>建立独立单位</small></p></div>
+          <div><span data-icon="branch"></span><p><strong>放到已有兵牌上</strong><small>编入该单位的下级</small></p></div>
+        </div>
+      </section>
+
+      <section id="unit-panel" role="tabpanel" aria-labelledby="unit-tab" hidden>
+        <p class="panel-placeholder" id="no-unit">在编制图上选择一个单位</p>
+        <div id="unit-fields" hidden>
+          <div class="inspector-preview">
+            <div id="inspector-symbol"></div>
+            <p id="inspector-caption"></p>
+          </div>
+          <label>单位名称<input id="unit-name" maxlength="32" autocomplete="off"></label>
+          <label>兵种<select id="unit-type"></select></label>
+          <label>编制级别<select id="unit-rank"></select></label>
+          <label>上级单位<select id="unit-parent"></select></label>
+          <p id="unit-role" class="unit-meta" hidden></p>
+          <p id="unit-strength-summary" class="unit-meta" hidden></p>
+          <label>单位自身人数<input id="unit-headcount" type="number" min="1" max="9999999" placeholder="上级可由下级汇总"></label>
+          <p id="unit-staff-summary" class="unit-meta" hidden></p>
+          <p id="unit-subordinate-summary" class="unit-meta" hidden></p>
+          <button type="button" class="button secondary" id="edit-unit-staff" hidden>编辑本部人员</button>
+          <button class="button secondary" id="fold-branch" hidden></button>
+          <button class="button secondary" id="fold-peers" hidden></button>
+          <button class="button secondary" id="lock-expansion" type="button" aria-pressed="false" hidden>锁定展开状态</button>
+          <button class="button delete-button" id="delete-unit"><span data-icon="trash"></span>删除单位</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <dialog id="new-dialog">
+    <form id="new-form">
+      <h2>新建编制</h2>
+      <p>创建一份独立的空白编制，可在编制列表中切换</p>
+      <label>编制名称<input id="new-title" maxlength="32" placeholder="未命名编制" autocomplete="off" autofocus></label>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" id="cancel-new">取消</button>
+        <button type="submit" class="button primary">创建编制</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="staff-dialog" aria-labelledby="staff-dialog-title">
+    <form id="staff-form">
+      <h2 id="staff-dialog-title"></h2>
+      <p>本部岗位独立计员，下辖单位的人数另计</p>
+      <div class="staff-columns" aria-hidden="true"><span>岗位</span><span>人数</span><span>军官</span></div>
+      <div id="staff-rows"></div>
+      <button type="button" class="button secondary" id="add-staff-row">添加岗位</button>
+      <p id="staff-total" aria-live="polite"></p>
+      <p id="staff-error" class="dialog-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" id="cancel-staff">取消</button>
+        <button type="submit" class="button primary">保存本部人员</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-dialog-title">
+    <form id="delete-form">
+      <h2 id="delete-dialog-title"></h2>
+      <p id="delete-description"></p>
+      <p id="delete-error" class="dialog-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" id="cancel-delete" autofocus>取消</button>
+        <button type="submit" class="button delete-button" id="confirm-delete">删除</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="preset-manager" aria-labelledby="preset-manager-title">
+    <div class="manager-heading">
+      <h2 id="preset-manager-title">兵牌预设管理</h2>
+      <button class="button secondary" id="edit-templates">编辑基础模板</button>
+    </div>
+    <section class="manager-catalog" aria-labelledby="whole-presets-title">
+      <h3 id="whole-presets-title">整套编制</h3>
+      <div id="whole-preset-list"></div>
+    </section>
+    <form id="save-formation-preset">
+      <label>预设名称<input id="formation-preset-name" maxlength="32" required autocomplete="off"></label>
+      <p id="manager-error" class="dialog-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" id="close-manager">关闭</button>
+        <button type="submit" class="button primary" id="save-current-preset">保存当前编制</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="preset-dialog" aria-labelledby="preset-dialog-title">
+    <form id="preset-form">
+      <h2 id="preset-dialog-title">编辑编制预设</h2>
+      <label class="preset-picker">选择预设<select id="preset-picker"></select></label>
+      <button type="button" class="button secondary" id="open-template-canvas" hidden>打开编制图</button>
+      <label>名称<input id="preset-name" maxlength="32" required autocomplete="off"></label>
+      <div class="preset-form-grid">
+        <label>兵牌图形<select id="preset-type"></select></label>
+        <label>编制级别<select id="preset-rank"></select></label>
+      </div>
+      <label>用途分类<input id="preset-role" maxlength="32" placeholder="如最小指挥战斗单位" autocomplete="off"></label>
+      <label>单位自身人数<input id="preset-headcount" type="number" min="1" max="9999999" placeholder="基层单位必填，上级可由下级汇总"></label>
+      <fieldset class="preset-parts">
+        <legend>下级组成</legend>
+        <p>选择已有预设并填写数量</p>
+        <div id="part-rows"></div>
+        <button type="button" class="button secondary" id="add-part">添加下级</button>
+      </fieldset>
+      <p id="preset-error" class="preset-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" id="cancel-preset">取消</button>
+        <button type="submit" class="button primary">保存预设</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="drag-preview" class="drag-preview" aria-hidden="true" hidden></div>
+  <div id="announcement" class="sr-only" aria-live="polite"></div>
+  <!-- UI design pass based on unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. -->
+</body>
+</html>
