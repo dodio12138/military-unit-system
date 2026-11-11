@@ -9,6 +9,14 @@ node --test tests/*.test.cjs
 
 浏览器打开 http://127.0.0.1:8765/ 。编制、预设和视图偏好保存在浏览器本地。
 
+## 在线版本与部署
+
+Pages 启用后的访问地址：https://dodio12138.github.io/military-unit-system/
+
+`.github/workflows/pages.yml` 在推送到 `main` 或手动运行时执行测试；通过后，仅将 `index.html`、`src/` 和 `assets/` 打包部署到 GitHub Pages。仓库的 Pages 发布源使用 GitHub Actions。
+
+线上页面与本地页面的浏览器存储各自独立，本机已保存的编制不会自动出现在在线版本中。
+
 ## 代码结构
 
 - `index.html`：工作台、属性面板与对话框。

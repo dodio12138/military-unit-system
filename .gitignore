@@ -2,3 +2,4 @@
 .playwright-cli/
 output/playwright/
 node_modules/
+_site/
