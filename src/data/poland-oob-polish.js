@@ -79,5 +79,5 @@ const polandPolishOob = (() => {
   for(const [id,place,lon,lat,geoId,url,basis] of positions){const u=units.find(x=>x.id===id);Object.assign(u,{place,lon,lat,positionAccuracy:'area',positionBasis:`${basis} 仅表示作战区域参考点，非指挥部或全体人员位置。`,geoSource:`https://www.geonames.org/${geoId}/`,sources:[...u.sources,{title:'开战日作战区域依据',url}]});}
   const reg24=units.find(u=>u.id==='pl-real-motor-10-reg-24');Object.assign(reg24,{place:'Jordanów',lon:19.82981,lat:49.64935,positionAccuracy:'inferred',positionBasis:'约旦努夫地区参考点，并非精确团部位置。',inferenceBasis:'IPN记载该团9月1日在Jordanów和Wysoka附近交战，取Jordanów作区域参考。',geoSource:'https://www.geonames.org/3097107/',sources:[...reg24.sources,{title:'IPN：第24枪骑兵团',url:'https://ipn.gov.pl/pl/aktualnosci/236398,Upamietnilismy-zolnierzy-24-Pulku-Ulanow-im-Hetmana-Stanislawa-Zolkiewskiego.html'}]});
   for(const u of units) if(!u.organizationStatus) u.organizationStatus = u.id==='pl-real-cav-suwalska-reg-4'?'attached':'documented';
-  return {units,sources:[army,regular,reserve,cavalry,field,official],coverage:'波兰8个既有战役司令部主要师、骑兵旅及已核查团级番号；不包含全部直属部队，动员编制不等于开战时实际到位。部分开战日区域有代表坐标，其余待定位。'};
+  return {units,sources:[army,regular,reserve,cavalry,field,official],coverage:'波兰8个既有战役司令部主要师、骑兵旅及已核查团级番号；不包含全部直属部队，动员编制不等于开战时实际到位。精确驻地资料仍不完整。'};
 })();

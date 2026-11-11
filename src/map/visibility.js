@@ -2,7 +2,7 @@
 
 // Bounds already include any desired viewport margin. Traversal is independent
 // of bounds because a formation's descendants may be far from its own marker.
-function mapVisibleAtZoom(model, {zoom, west, east, south, north, autoDetail = true, collapsed = new Set(), limit = 450}) {
+function mapVisibleAtZoom(model, {zoom, west, east, south, north, autoDetail = true, collapsed = new Set(), limit = 600}) {
   const thresholds = {theatre:6, armyGroup:7, fieldArmy:8, corps:9, division:10, regiment:12, battalion:13, company:15, platoon:16, squad:17};
   const reachable = [];
   const expanded = new Set();
@@ -45,22 +45,4 @@ function mapVisibleAtZoom(model, {zoom, west, east, south, north, autoDetail = t
   for (const id of reachable) if (inBounds(id)) addChain(id);
   const ids = reachable.filter(id => included.has(id) && model.hasPosition(id));
   return {ids, expanded, limited, reachableIds: reachable};
-}
-
-// Return descendants in command order without assigning positions to them.
-// The supplied expansion set is the logical expansion returned by the view.
-function mapZoomPendingBranch(model, rootId, expanded) {
-  const rows = [];
-  const visit = (parent, depth) => {
-    if (!expanded.has(parent)) return;
-    for (const id of model.children.get(parent) ?? []) {
-      const unit = model.units.get(id);
-      if (!unit || (model.side !== 'both' && unit.side !== model.side)) continue;
-      rows.push({id, parent, depth, pending: !model.hasPosition(id)});
-      visit(id, depth + 1);
-    }
-  };
-  const root = model.units.get(rootId);
-  if (root && (model.side === 'both' || root.side === model.side)) visit(rootId, 1);
-  return rows;
 }

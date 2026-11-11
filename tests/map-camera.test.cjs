@@ -34,7 +34,7 @@ test('production zoom keeps geographic point beneath cursor and never modifies u
   const start=source.indexOf('function zoom('),end=source.indexOf('\nfunction screenGeo',start);
   assert.ok(start>=0&&end>start);
   const positions={sample:{lon:21.01,lat:52.23}};
-  const context=vm.createContext({camera:{x:-500,y:-1000,scale:.7},svg:{clientWidth:1200,clientHeight:800},autoDetail:true,zoomCollapsed:new Set(['manual','locked']),visibleIds:[],model:{positions,locked:id=>id==='locked'},renderZoomDetail(){},applyCamera(){},clearTimeout(){},setTimeout(){},save(){},saveTimer:null});
+  const context=vm.createContext({camera:{x:-500,y:-1000,scale:.7},svg:{clientWidth:1200,clientHeight:800},autoDetail:true,zoomCollapsed:new Set(['manual','locked']),model:{positions,locked:id=>id==='locked'},applyCamera(){},clearTimeout(){},setTimeout(){},save(){},saveTimer:null});
   vm.runInContext(source.slice(start,end),context);
   for(const factor of [1.5,.66,100,.001,1e8]) {
     const before={...context.camera},cursor={x:324,y:217};
