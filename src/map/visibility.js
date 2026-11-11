@@ -3,8 +3,9 @@
 // Bounds already include any desired viewport margin. Traversal is independent
 // of bounds because a formation's descendants may be far from its own marker.
 function mapVisibleAtZoom(model, {zoom, west, east, south, north, autoDetail = true, collapsed = new Set(), limit = 450}) {
-  const thresholds = {theatre:6, armyGroup:7, fieldArmy:9, division:10, regiment:12, battalion:13, company:15, platoon:16, squad:17};
+  const thresholds = {theatre:6, armyGroup:7, fieldArmy:8, corps:9, division:10, regiment:12, battalion:13, company:15, platoon:16, squad:17};
   const reachable = [];
+  const expanded = new Set();
   const visit = (id, locked) => {
     const unit = model.units.get(id);
     if (!unit || (model.side !== 'both' && unit.side !== model.side)) return;
@@ -12,6 +13,7 @@ function mapVisibleAtZoom(model, {zoom, west, east, south, north, autoDetail = t
     const frozen = locked || model.locks.has(id);
     const open = !collapsed.has(id) && (model.expanded.has(id) ||
       (autoDetail && !frozen && zoom >= (unit.commandCategory==='highCommand'?6:unit.commandCategory==='operationalGroup'?9:thresholds[unit.rank] ?? Infinity)));
+    if(open&&(model.children.get(id)??[]).length)expanded.add(id);
     if (open) for (const child of model.children.get(id) ?? []) visit(child, frozen);
   };
   if (model.focus) visit(model.focus, model.ancestors(model.focus).some(id => model.locks.has(id)));
@@ -42,6 +44,5 @@ function mapVisibleAtZoom(model, {zoom, west, east, south, north, autoDetail = t
   if (model.selected && reachableSet.has(model.selected)) addChain(model.selected);
   for (const id of reachable) if (inBounds(id)) addChain(id);
   const ids = reachable.filter(id => included.has(id) && model.hasPosition(id));
-  const expanded = new Set(ids.filter(id => (model.children.get(id) ?? []).some(child => included.has(child))));
   return {ids, expanded, limited};
 }

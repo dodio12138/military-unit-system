@@ -12,6 +12,9 @@
 .map-legend i { display:inline-block; width:20px; height:12px; border:1.5px solid; }
 .german-key { background:#83adb3; border-color:#245d65; }
 .polish-key { background:#d4ad8b; border-color:#794b31; }
+.map-territory { stroke:none; pointer-events:none; opacity:.24; }
+.map-territory.germany { fill:#377c88; }
+.map-territory.poland { fill:#d1945c; }
 .estimate-tag { color:#715624; }
 .map-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--hud-bar); padding:8px; border:1px solid var(--hud-border); }
 .map-toolbar select { width:auto; min-width:100px; }
@@ -102,3 +105,44 @@
 .editing-deployment .map-marker { cursor:move; }
 .map-evidence-link { display:block; margin-top:8px; color:var(--accent); overflow-wrap:anywhere; }
 .map-catalog-note { display:block; margin-top:5px; line-height:1.5; }
+
+/* Historical reference lines retain stroke width at every zoom. */
+.map-historical-border { fill:none; stroke:#776448; stroke-width:1.4; stroke-dasharray:7 4; vector-effect:non-scaling-stroke; opacity:.85; pointer-events:stroke; }
+.map-historical-border.poland { stroke:#6c4a30; stroke-width:2.4; }
+.map-historical-border.danzig { stroke:#785264; stroke-width:2.2; stroke-dasharray:3 3; }
+.map-marker.inferred-position .symbol-frame { stroke-dasharray:4 2; }
+.map-marker .map-inference-badge { font-size:9px; font-weight:700; }
+.map-command-link.disputed { stroke:#9a6c26; stroke-dasharray:2 4; }
+#map-basemap-attribution { display:contents; }
+.map-attribution { gap:2px 8px; }
+.map-zoom,.map-mapkey { bottom:48px; }
+.map-order-of-battle { padding:16px 20px; border-bottom:1px solid var(--line); }
+.map-order-of-battle > summary { cursor:pointer; margin-bottom:10px; }
+.map-order-of-battle > summary small { color:var(--secondary); font-size:11px; }
+#map-catalog { max-height:310px; overflow:auto; font-family:"PingFang SC","Microsoft YaHei",sans-serif; }
+.map-tree-branch > summary { display:flex; align-items:center; cursor:pointer; }
+.map-tree-branch > summary::before { content:'›'; flex:none; width:12px; color:var(--secondary); }
+.map-tree-branch[open] > summary::before { transform:rotate(90deg); }
+.map-tree-branch > summary::-webkit-details-marker { display:none; }
+.map-tree-children { margin-left:12px; padding-left:4px; border-left:1px solid var(--line); }
+.map-tree-unit { font:12px/1.5 "PingFang SC","Microsoft YaHei",sans-serif; padding:8px 2px; gap:4px; }
+.map-tree-unit span { min-width:0; overflow-wrap:anywhere; }
+.map-tree-unit small { flex:none; font-size:10px; }
+.map-tree-unit[aria-current="true"] { background:var(--accent-light); color:var(--accent-dark); }
+.map-inference-note { font-size:12px; color:#895c25; line-height:1.7; }
+.map-fullscreen-button { position:absolute; top:12px; right:12px; z-index:5; background:var(--panel); }
+.map-tile-status { top:52px; }
+body.map-fullscreen-open { overflow:hidden; }
+.map-board.map-fullscreen,.map-board:fullscreen { position:fixed; inset:0; width:100vw; height:100dvh; z-index:200; border:0; }
+.map-fullscreen .map-tooltip,.map-fullscreen .unit-context-menu { z-index:220; }
+@media(max-width:700px) { .map-mapkey { bottom:98px; } .map-zoom { bottom:64px; } .map-attribution { font-size:9px; } }
+
+.map-command-link.indirect { stroke-dasharray:2 5; opacity:.7; }
+.map-colocated-badge { pointer-events:none; }
+.map-marker .map-colocated-badge text { font-size:9px; }
+
+.map-fullscreen-tools { display:none; position:absolute; top:12px; left:12px; gap:6px; z-index:4; }
+.map-fullscreen .map-fullscreen-tools { display:flex; }
+.map-fullscreen-tools button { background:var(--panel); }
+.map-fullscreen .map-focus { top:56px; }
+@media(max-width:500px) { .map-fullscreen-tools { gap:3px; left:6px; } .map-fullscreen-tools button { padding-inline:6px; } .map-fullscreen-button { right:6px; } }

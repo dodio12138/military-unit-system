@@ -1,0 +1,11 @@
+# 波兰陆军战斗序列：1939年9月1日
+
+本数据覆盖既有的七个集团军及纳雷夫独立作战集群的主要师、骑兵旅，列出来源所列步兵、骑兵与师属轻炮团，以及喀尔巴阡集团军的两个山地旅。实际作战集群按原名标识，不改称军。各部并非完整战斗序列：直属炮兵、工兵、边防、国民防卫及服务部队未完整收录，已补第10摩托化骑兵旅两个团，其余直属单位仍待考证。预备集团军与预备师的动员和到位状态存在差异，标注并非均已到位。来源中规划配属但开战时未到位者有特别提示。
+
+集团军及集团军群以下师旅的归属主要依照 [1939年9月1日波军编制汇总](https://www.generalstaff.org/NAF/Pt_I_1939-1940/939pipa.pdf)，它是二手汇编，部分记号表示原定配属但未到达；[常备师](https://niehorster.org/029_poland/organizations/div-inf.html)、[预备师](https://niehorster.org/029_poland/organizations/div-res.html)及[骑兵旅](https://www.niehorster.org/029_poland/organizations/brig_cav.html)番号来自 Niehorster 的动员编制表；[波军野战部队汇编](https://www.generalstaff.org/NAF/Pt_I_1939-1940/939pxph.pdf)提供山地旅部队。各表为研究者整理，不是全部单位当日战报：师属团番号反映动员编制，不必然证明团在9月1日已向师集结。第3骑马步枪团按来源注释放入苏瓦乌基旅，其原属诺沃格鲁德克旅。
+
+[美国陆军战史研究](https://www.ibiblio.org/hyperwar/USA/DAP-Poland/Campaign-II.html)提供波军战前组织背景，是战后研究而非当日原始战报。依据市政府、军方刊物、IPN、公立学校及地方历史刊物，为9个师旅填入9月1日作战区域代表点；这些城市或村庄坐标来自 GeoNames 波兰地名库，不是总部位置或全体部队位置。姆瓦瓦地区第8师及两个骑兵旅的地点仅为广域参考。第24枪骑兵团据 IPN 的约旦努夫/维索卡战斗记载推定区域点，其余未经证实的下属仍待定位。没有借用和平时期驻地或机械复制父级坐标。第22山地师集团军隶属与交接时间存在资料歧见，暂列最高统帅部下、状态为计划而非已到位。员额未知而非零人。不同研究和计划与实际到位之间可能存在差异；不应将本序列视为完整或逐小时还原。
+
+区域证据包括 [姆瓦瓦市政府](https://www.mlawa.pl/vcontent_print/node/23825)、[军方刊物](https://www.polska-zbrojna.pl/home/articleshow/20555)、[IPN 第7师](https://katowice.ipn.gov.pl/pl3/aktualnosci/75688,Otwarcie-wystawy-7-Dywizja-Piechoty-Zapomniani-bohaterowie-1939-Czestochowa-31-s.html)、[IPN 莫克拉](https://ipn.gov.pl/pl/aktualnosci/2393,Obchody-69-rocznicy-bitwy-pod-Mokra-Mokra-31-sierpnia-2008-r.html)、[第6师](https://ckziumragowo.pl/historia/6%20Dywizja-Piechoty-w-II-RP)、[IPN 2022年6月刊第29页](https://archiwum.ipn.gov.pl/download/1/938209/BIULETYN62022.pdf)及[第1山地旅地方史](https://www.gminaradlow.pl/pro_radlow/zasoby/files/radlo/2023-3.pdf)。[GeoNames PL.zip](https://download.geonames.org/export/dump/PL.zip) 提供参考点，每个节点另附地名编号。
+
+**同号团辨析：**第1山地旅的第2边防军步兵团（2 Pułk Piechoty KOP）亦称第2山地步枪团（2 Pułk Strzelców Górskich）；第22山地师的第2波德哈莱步枪团（2 Pułk Strzelców Podhalańskich）为另一支部队。原先中文均简写为“第2山地步枪团”，现已修正译名，不是重复隶属。[博物馆论文注7](https://muzn.pl/wp-content/uploads/2022/12/ee4812f7-30_a-jednak-wojna.pdf)依据战史记述第1旅由两个边防军团组成及其别称；[波兰陆军山地部队历史](https://www.wojsko-polskie.pl/21bsp/historia-wojsk-gorskich/)列明第22师的第2波德哈莱团。[Niehorster 1939年9月1日动员表](https://niehorster.org/029_poland/organizations/div-inf.html)亦列第22师第2、5、6山地团。

@@ -27,7 +27,7 @@ test('focus, side, locks and explicit collapse control reachable branches',()=>{
   m.expanded.add('de-3'); assert.ok(run(m,17).ids.length>1);
   assert.deepEqual(Array.from(run(m,17,{collapsed:new Set(['de-3'])}).ids),['de-3']);
 });
-test('manual mode follows saved expansion and reports only visible children',()=>{
+test('manual mode follows saved expansion without inventing open descendants',()=>{
   const m=new CommandMapModel(polandScenario); m.focus='de-3'; m.expanded.add('de-3');
   const result=run(m,17,{autoDetail:false});
   assert.deepEqual(Array.from(result.ids),Array.from(m.visible()));

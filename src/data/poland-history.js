@@ -24,7 +24,18 @@ const polandHistoricalScenario = (() => {
     'pl-narew': {place:'待定位',timeNote:'1939年9月1日总部地点待核实',sources:[{title:'波兰政府教育资料：1939年9月1日部队',url:'https://zpe.gov.pl/a/sprawdz-sie/D18GDUBj0'}]},
     'pl-prusy': {place:'待定位',timeNote:'9月1日中午移至 Skierniewice；此前位置待核实',sources:[{title:'彼得库夫战役',url:'https://iwa.magnum-x.pl/artykul/bitwapodpiotrkowem'}]}
   };
-  const units = polandScenario.units.filter(unit => Object.hasOwn(records,unit.id)).map(unit => {
+  const commands = [
+    ['de-okh',null,'德国陆军最高统帅部（OKH）','none','german','highCommand'],
+    ['de-north','de-okh','北方集团军群','armyGroup','german'],['de-south','de-okh','南方集团军群','armyGroup','german'],
+    ['de-3','de-north','德军第3集团军','fieldArmy','german'],['de-4','de-north','德军第4集团军','fieldArmy','german'],
+    ['de-8','de-south','德军第8集团军','fieldArmy','german'],['de-10','de-south','德军第10集团军','fieldArmy','german'],['de-14','de-south','德军第14集团军','fieldArmy','german'],
+    ['pl-high',null,'波兰最高统帅部','none','polish','highCommand'],
+    ['pl-pomorze','pl-high','波美拉尼亚集团军','fieldArmy','polish'],['pl-poznan','pl-high','波兹南集团军','fieldArmy','polish'],['pl-lodz','pl-high','罗兹集团军','fieldArmy','polish'],
+    ['pl-krakow','pl-high','克拉科夫集团军','fieldArmy','polish'],['pl-karpaty','pl-high','喀尔巴阡集团军','fieldArmy','polish'],['pl-modlin','pl-high','莫德林集团军','fieldArmy','polish'],
+    ['pl-narew','pl-high','纳雷夫独立作战集群','none','polish','operationalGroup'],['pl-prusy','pl-high','普鲁士集团军','fieldArmy','polish']
+  ];
+  const units = commands.map(([id,parent,name,rank,side,commandCategory]) => {
+    const unit={id,parent,name,rank,side,commandCategory};
     const record = records[unit.id];
     const located = Number.isFinite(record.lon) && Number.isFinite(record.lat);
     return {id:unit.id,parent:unit.parent,name:unit.name,rank:unit.rank,...(unit.commandCategory?{commandCategory:unit.commandCategory}:{}),
@@ -32,8 +43,9 @@ const polandHistoricalScenario = (() => {
       lon:located?record.lon:null,lat:located?record.lat:null,
       positionAccuracy:located?'city':'unlocated',positionBasis:located?'史料所载城镇的现代地名代表点，非总部精确位置':'总部地点或具体时刻待核实',...record};
   });
-  return {id:'poland-1939-historical-hq',revision:'historical-hq-1',title:'1939年9月1日：高级指挥部（史料核查）',date:'1939-09-01',
-    description:'仅显示已核查的高级指挥节点，不代表完整战斗序列。城镇坐标是现代地名代表点，不是总部建筑或部队部署位置；未核实的总部不赋予虚构坐标。德方初始部署资料未注明具体时刻。',
-    defaultExpanded:units.map(unit=>unit.id),bounds:polandScenario.bounds,cities:polandScenario.cities,features:polandScenario.features,
-    sources:[...new Map([us,campaign,...Object.values(records).flatMap(record=>record.sources)].map(source=>[source.url,source])).values()],units};
+  return {id:'poland-1939-historical-hq',revision:'historical-oob-2',title:'1939年9月1日：德波陆军编制与部署',date:'1939-09-01',
+    description:'真实番号与来源支持的指挥关系，补到军、师、旅、团。城镇点与作战地域点不是全单位或总部的精确位置；推断单独标记，待定位仍保留指挥链。动员编制、计划归属与实际到位有区别，详见节点说明。并非全部参战部队的完整序列。',
+    coverage:[polandGermanOob.coverage,polandPolishOob.coverage],
+    defaultExpanded:units.map(unit=>unit.id),bounds:{west:12,east:30,south:47.5,north:56},
+    sources:[...new Map([us,campaign,...Object.values(records).flatMap(record=>record.sources),...polandGermanOob.sources,...polandPolishOob.sources].map(source=>[source.url,source])).values()],units:[...units,...polandGermanOob.units,...polandPolishOob.units]};
 })();
