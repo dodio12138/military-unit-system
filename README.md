@@ -13,9 +13,17 @@ node --test tests/*.test.cjs
 
 Pages 启用后的访问地址：https://dodio12138.github.io/military-unit-system/
 
-`.github/workflows/pages.yml` 在推送到 `main` 或手动运行时执行测试；通过后，仅将 `index.html`、`src/` 和 `assets/` 打包部署到 GitHub Pages。仓库的 Pages 发布源使用 GitHub Actions。
+`.github/workflows/pages.yml` 在推送到 `main` 或手动运行时执行测试；通过后，仅将 `index.html`、`map.html`、`src/` 和 `assets/` 打包部署到 GitHub Pages。仓库的 Pages 发布源使用 GitHub Actions。
 
 线上页面与本地页面的浏览器存储各自独立，本机已保存的编制不会自动出现在在线版本中。
+
+## 指挥地图
+
+从顶栏进入「指挥地图」，或打开 `map.html`。以 1939 年 9 月 1 日波兰战役为背景，包含德波双方历史指挥骨架和 13 个虚构示例师，共 3,362 个单位。示例编制可逐层展开到三人小组，指挥部、炮组、车组均有独立坐标。
+
+点击兵牌检查人数与位置，双击展开或折叠；「查看下属部署」聚焦一个分支，搜索可定位任意单位。支持经纬度编辑、拖动时带动整个下属分支、撤销移动、展开锁定、阵营筛选和指挥连线。地图保存独立于编制编辑器，刷新后恢复；导出当前视野为 SVG。
+
+密集处只对兵牌显示位置做避让，圆点和引线指明实际保存的推定坐标。底图为本地矢量示意，无外部瓦片服务；基层位置、编成、人数和装备不是经核实的历史部署。来源与范围见 [地图数据说明](docs/poland-1939-sources.md)。
 
 ## 代码结构
 
@@ -27,6 +35,9 @@ Pages 启用后的访问地址：https://dodio12138.github.io/military-unit-syst
 - `src/render/symbols.js`：兵种、级别、SVG 兵牌与厚度侧面绘制。
 - `src/render/projection.js`：全画布投影矩阵、逆变换与边界计算。
 - `src/render/view-mode.js`：平面 / 2.5D 切换和独立保存的显示偏好。
+- `src/map/model.js`：独立的地理坐标、层级、汇总、展开锁定与存储模型。
+- `src/map/controller.js`：地图渲染、部署交互、查看指挥链与导出。
+- `src/data/poland-1939.js`：波兰战役背景、示意底图和基层示例数据。
 - `src/editor.js`：画布交互、编制树编辑、折叠与叠牌、撤销、属性编辑、保存和导出。
 - `assets/styles/`：工作台布局及 Pixel HUD 适配。
 - `assets/hud/`：第三方样式、字体及许可证。
