@@ -1,0 +1,790 @@
+/*!
+ * Pixel HUD skin: a flight-computer look for any web page.
+ * Pixel CJK type, square edges, title-bar strips, CRT scanlines, gauge
+ * sliders, lamp switches and inverted keys, layered over a palette.
+ *
+ * Turn it on with data-skin="pixel" on <html> (or any container).
+ * Colors come from --hud-* tokens: load palettes.css and pick one with
+ * data-hud-palette, or map your app's own colors onto the tokens
+ * (references/integration.md). Fonts: fonts.css.
+ *
+ * MIT. Fusion Pixel font: OFL-1.1, TakWolf.
+ */
+
+/* ------------------------------------------------------------------
+   Tokens. :where() keeps every default at zero specificity, so a
+   palette or your own mapping always wins without !important.
+   ------------------------------------------------------------------ */
+:where(:root) {
+  /* Surfaces and text (Starward palette as the fallback). */
+  --hud-bg: #050a17;
+  --hud-panel: #0a1530;
+  --hud-hover: #12244a;
+  --hud-selected: #1a3363;
+  --hud-border: #4f86c6;
+  --hud-text: #dbe9fb;
+  --hud-text-muted: #aac6e6;
+  --hud-text-dim: #8fb0d6;
+  --hud-accent: #8fd3ff;
+  --hud-accent-contrast: #04102a;
+
+  /* HUD roles, derived from the above unless a palette sets them. */
+  --hud-bar: var(--hud-accent);            /* title bars, selected tabs, keys on hover */
+  --hud-bar-text: var(--hud-accent-contrast);
+  --hud-green: #5cd98a;                    /* "on": lamps, emphasis, focus, caret */
+  --hud-green-contrast: #06210f;           /* text on a green key */
+  --hud-yellow: #ffd23f;                   /* values, tags, inline code */
+  --hud-orange: #ff9a2e;                   /* notes, warnings */
+  --hud-red: #ff5d5d;                      /* danger */
+  --hud-info: #6366f1;                     /* a second action color */
+  --hud-scanline: rgba(0, 0, 0, 0.16);     /* 0 to turn the lines off */
+
+  /* Type. The pixel faces are drawn on a 12px grid: 12/24px stay sharpest. */
+  --hud-font: "Fusion Pixel 12px Proportional SC", "Fusion Pixel 12px Monospaced SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --hud-font-mono: "Fusion Pixel 12px Monospaced SC", "Fusion Pixel 12px Proportional SC", ui-monospace, monospace;
+
+  /* Soft tints used by table and code heads. */
+  --hud-bar-soft: color-mix(in srgb, var(--hud-bar) 22%, var(--hud-bg));
+  --hud-bar-line: color-mix(in srgb, var(--hud-bar) 60%, var(--hud-bg));
+
+  /* Spacing: a 4px grid, 2px for details (references/design-system.md). */
+  --hud-space-1: 2px;
+  --hud-space-2: 4px;
+  --hud-space-3: 8px;
+  --hud-space-4: 12px;
+  --hud-space-5: 16px;
+  --hud-space-6: 24px;
+  --hud-space-7: 32px;
+
+  /* Type scale. 12 and 24 sit on the pixel grid and are the sharpest. */
+  --hud-text-xs: 12px;
+  --hud-text-sm: 14px;
+  --hud-text-md: 16px;
+  --hud-text-lg: 24px;
+  --hud-text-xl: 36px;
+
+  /* Control heights: small, default, large. */
+  --hud-control-sm: 24px;
+  --hud-control-md: 28px;
+  --hud-control-lg: 32px;
+
+  /* Overlays only: a hard, offset shadow, like a panel laid over the screen. */
+  --hud-shadow: 3px 3px 0 0 color-mix(in srgb, #000 45%, transparent);
+}
+
+/* ------------------------------------------------------------------
+   Globals under the skin: type, edges, selection, scrollbars, focus,
+   scanlines. Nothing here changes layout.
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] {
+  font-family: var(--hud-font);
+  font-size: var(--hud-text-sm);
+  line-height: 1.6;
+  color: var(--hud-text);
+  background: var(--hud-bg);
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeSpeed;
+}
+/* Without a palette the Starward defaults apply, which are dark. */
+[data-skin="pixel"]:not([data-hud-palette]) { color-scheme: dark; }
+[data-skin="pixel"] :is(code, kbd, samp, pre, .hud-mono) {
+  font-family: var(--hud-font-mono);
+}
+
+/* Square, hard-edged everything. !important beats inline and utility radii. */
+[data-skin="pixel"],
+[data-skin="pixel"] *,
+[data-skin="pixel"] *::before,
+[data-skin="pixel"] *::after {
+  border-radius: 0 !important;
+}
+
+/* Control sizes are outer sizes (the spec's 24/28/32px), whatever the page's box model. */
+[data-skin="pixel"] :is(input, textarea, select, button, .hud-btn, .hud-icon-btn, .hud-tab, .hud-switch, .hud-gauge, .hud-badge, .hud-menu__item) { box-sizing: border-box; }
+
+/* Classes that set display must never show what the page hides. */
+[data-skin="pixel"] [hidden] { display: none !important; }
+
+[data-skin="pixel"] ::selection {
+  background: var(--hud-bar);
+  color: var(--hud-bar-text);
+}
+
+[data-skin="pixel"] :focus-visible {
+  outline: 1px solid var(--hud-green);
+  outline-offset: 1px;
+}
+
+[data-skin="pixel"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+[data-skin="pixel"] ::-webkit-scrollbar-track { background: var(--hud-panel); }
+[data-skin="pixel"] ::-webkit-scrollbar-thumb { background: var(--hud-border); }
+[data-skin="pixel"] ::-webkit-scrollbar-thumb:hover { background: var(--hud-accent); }
+[data-skin="pixel"] { scrollbar-color: var(--hud-border) var(--hud-panel); }
+
+/* CRT scanlines over the page when the skin is on <html>; they never take
+   pointer events. Off with data-hud-scanlines="off" on <html>. A skin scoped to
+   a container gets them only on elements with .hud-scanlines (a positioned box). */
+html[data-skin="pixel"]:not([data-hud-scanlines="off"]) body::after,
+[data-skin="pixel"] .hud-scanlines::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    var(--hud-scanline) 2px,
+    var(--hud-scanline) 3px
+  );
+}
+[data-skin="pixel"] .hud-scanlines { position: relative; }
+[data-skin="pixel"] .hud-scanlines::after { position: absolute; z-index: 1; }
+@media print {
+  html[data-skin="pixel"] body::after,
+  [data-skin="pixel"] .hud-scanlines::after { display: none; }
+}
+
+/* ------------------------------------------------------------------
+   Form controls that need no class.
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  font: inherit;
+  color: var(--hud-text);
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  padding: 4px 8px;
+}
+[data-skin="pixel"] :is(input, textarea, select):focus {
+  border-color: var(--hud-accent);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--hud-bg), 0 0 0 2px color-mix(in srgb, var(--hud-accent) 25%, transparent);
+}
+[data-skin="pixel"] ::placeholder { color: var(--hud-text-dim); }
+[data-skin="pixel"] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--hud-green); }
+
+/* Range: a segmented gauge track and a square block thumb. */
+[data-skin="pixel"] input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+[data-skin="pixel"] input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  border: 1px solid var(--hud-border);
+  background:
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--hud-accent) 35%, transparent) 0 3px, transparent 3px 5px) 2px 2px / calc(100% - 4px) 4px no-repeat,
+    var(--hud-panel);
+}
+[data-skin="pixel"] input[type="range"]::-moz-range-track {
+  height: 8px;
+  border: 1px solid var(--hud-border);
+  background:
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--hud-accent) 35%, transparent) 0 3px, transparent 3px 5px) 2px 2px / calc(100% - 4px) 4px no-repeat,
+    var(--hud-panel);
+}
+[data-skin="pixel"] input[type="range"]::-moz-range-progress {
+  height: 8px;
+  background: repeating-linear-gradient(to right, var(--hud-green) 0 3px, transparent 3px 5px);
+}
+[data-skin="pixel"] input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 18px;
+  margin-top: -5px;
+  border: 1px solid var(--hud-bar-text);
+  background: var(--hud-bar);
+  box-shadow: 0 0 0 1px var(--hud-bar), inset 0 -3px 0 color-mix(in srgb, var(--hud-bar-text) 25%, transparent);
+}
+[data-skin="pixel"] input[type="range"]::-moz-range-thumb {
+  width: 8px;
+  height: 16px;
+  border: 1px solid var(--hud-bar-text);
+  background: var(--hud-bar);
+}
+[data-skin="pixel"] input[type="range"]:is(:hover, :active)::-webkit-slider-thumb {
+  background: var(--hud-green);
+  box-shadow: 0 0 0 1px var(--hud-green);
+}
+[data-skin="pixel"] input[type="range"]:hover::-moz-range-thumb { background: var(--hud-green); }
+[data-skin="pixel"] input[type="range"]:disabled { cursor: default; opacity: 0.5; }
+
+/* ------------------------------------------------------------------
+   Panels and title bars.
+   .hud-panel           a ruled box
+   .hud-titlebar        the sky strip on top of a panel (dark text)
+   .hud-subhead         a quieter, ruled sub-heading inside a panel
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-panel {
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+}
+[data-skin="pixel"] .hud-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 8px;
+  background: var(--hud-bar);
+  color: var(--hud-bar-text);
+  letter-spacing: 0.06em;
+}
+[data-skin="pixel"] .hud-titlebar :is(button, a, span, svg) { color: inherit; }
+[data-skin="pixel"] .hud-titlebar :is(h1, h2, h3, h4) { margin: 0; font: inherit; font-size: var(--hud-text-sm); font-weight: 400; }
+[data-skin="pixel"] .hud-titlebar__actions { margin-left: auto; display: flex; gap: var(--hud-space-1); }
+[data-skin="pixel"] .hud-titlebar .hud-icon-btn { width: 22px; height: 22px; }
+[data-skin="pixel"] .hud-panel__body { padding: var(--hud-space-4); }
+[data-skin="pixel"] .hud-subhead {
+  padding: 4px 8px;
+  color: var(--hud-accent);
+  border-bottom: 1px solid var(--hud-border);
+  letter-spacing: 0.04em;
+}
+
+/* ------------------------------------------------------------------
+   Keys (buttons).
+   .hud-btn                         outlined key; lights up (inverts) on hover
+   .hud-btn.is-solid[data-intent]   solid key in an intent color:
+                                    accent (default) | go | warn | info | danger
+   .hud-icon-btn                    square icon key; inverts on hover,
+                                    the other way round on a title bar
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] :is(.hud-btn, .hud-icon-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  color: var(--hud-text);
+  background: transparent;
+  border: 1px solid var(--hud-border);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s, filter 0.1s;
+}
+[data-skin="pixel"] .hud-btn { height: var(--hud-control-md); padding: 0 var(--hud-space-4); white-space: nowrap; }
+[data-skin="pixel"] .hud-icon-btn { width: var(--hud-control-md); height: var(--hud-control-md); padding: 0; }
+[data-skin="pixel"] .hud-btn.is-sm { height: var(--hud-control-sm); padding: 0 var(--hud-space-3); font-size: var(--hud-text-xs); }
+[data-skin="pixel"] .hud-btn.is-lg { height: var(--hud-control-lg); padding: 0 var(--hud-space-5); }
+[data-skin="pixel"] .hud-icon-btn.is-sm { width: var(--hud-control-sm); height: var(--hud-control-sm); }
+[data-skin="pixel"] .hud-icon-btn.is-lg { width: var(--hud-control-lg); height: var(--hud-control-lg); }
+[data-skin="pixel"] :is(.hud-btn, .hud-icon-btn) svg { width: 14px; height: 14px; flex: none; }
+/* Pressed: the key moves 1px down-right, like a physical key. */
+[data-skin="pixel"] :is(.hud-btn, .hud-icon-btn, .hud-tab, .hud-segmented > button):not(:disabled):active { transform: translate(1px, 1px); }
+[data-skin="pixel"] .hud-btn.is-solid:not(:disabled):active { filter: brightness(0.9); }
+/* Loading: the label gives way to three stepping blocks; the key keeps its look. */
+[data-skin="pixel"] .hud-btn[aria-busy="true"] { position: relative; color: transparent !important; pointer-events: none; }
+[data-skin="pixel"] .hud-btn[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 22px;
+  height: 6px;
+  background:
+    linear-gradient(var(--_busy, currentColor), var(--_busy, currentColor)) 0 0 / 6px 6px no-repeat,
+    linear-gradient(var(--_busy, currentColor), var(--_busy, currentColor)) 8px 0 / 6px 6px no-repeat,
+    linear-gradient(var(--_busy, currentColor), var(--_busy, currentColor)) 16px 0 / 6px 6px no-repeat;
+  animation: hud-busy 0.9s steps(3, end) infinite;
+}
+[data-skin="pixel"] .hud-btn[aria-busy="true"]:not(.is-solid) { --_busy: var(--hud-text); }
+[data-skin="pixel"] .hud-btn.is-solid[aria-busy="true"] { --_busy: var(--_key-text); }
+@keyframes hud-busy {
+  0% { clip-path: inset(0 66% 0 0); }
+  100% { clip-path: inset(0 -10% 0 0); }
+}
+[data-skin="pixel"] :is(.hud-btn, .hud-icon-btn):not(.is-solid):not(:disabled):hover {
+  background: var(--hud-bar);
+  border-color: var(--hud-bar);
+  color: var(--hud-bar-text);
+}
+[data-skin="pixel"] .hud-titlebar :is(.hud-btn, .hud-icon-btn) {
+  border-color: transparent;
+  color: var(--hud-bar-text);
+}
+[data-skin="pixel"] .hud-titlebar :is(.hud-btn, .hud-icon-btn):not(:disabled):hover {
+  background: var(--hud-bar-text);
+  border-color: var(--hud-bar-text);
+  color: var(--hud-bar);
+}
+[data-skin="pixel"] .hud-btn.is-solid {
+  --_key: var(--hud-accent);
+  --_key-text: var(--hud-accent-contrast);
+  background: var(--_key);
+  border-color: var(--_key);
+  color: var(--_key-text);
+}
+[data-skin="pixel"] .hud-btn.is-solid[data-intent="go"] { --_key: var(--hud-green); --_key-text: var(--hud-green-contrast); }
+[data-skin="pixel"] .hud-btn.is-solid[data-intent="warn"] { --_key: #eab308; --_key-text: #1f1600; }
+[data-skin="pixel"] .hud-btn.is-solid[data-intent="info"] { --_key: var(--hud-info); --_key-text: #ffffff; }
+[data-skin="pixel"] .hud-btn.is-solid[data-intent="danger"] { --_key: var(--hud-red); --_key-text: #ffffff; }
+[data-skin="pixel"] .hud-btn.is-solid:not(:disabled):hover { filter: brightness(1.12); }
+/* Unavailable keys keep their color and fade, rather than changing style. */
+[data-skin="pixel"] :is(.hud-btn, .hud-icon-btn):disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ------------------------------------------------------------------
+   Tabs and selectable rows: the selected one is an inverted key.
+   .hud-tabs > .hud-tab[aria-selected="true"]
+   .hud-row[aria-current="true" | aria-selected="true"]   (list rows)
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+[data-skin="pixel"] .hud-tab {
+  font: inherit;
+  height: var(--hud-control-md);
+  padding: 0 var(--hud-space-4);
+  color: var(--hud-text);
+  background: transparent;
+  border: 1px solid var(--hud-border);
+  cursor: pointer;
+}
+[data-skin="pixel"] .hud-tab:hover { background: var(--hud-hover); }
+[data-skin="pixel"] .hud-tab[aria-selected="true"] {
+  background: var(--hud-bar);
+  border-color: var(--hud-bar);
+  color: var(--hud-bar-text);
+}
+[data-skin="pixel"] .hud-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  color: var(--hud-text);
+}
+[data-skin="pixel"] .hud-row:hover { background: var(--hud-hover); }
+[data-skin="pixel"] .hud-row:is([aria-current="true"], [aria-current="page"], [aria-selected="true"]) {
+  background: var(--hud-bar);
+  color: var(--hud-bar-text);
+  box-shadow: inset 3px 0 0 var(--hud-green);
+}
+/* Icon keys inside a selected row invert the other way, to stay visible. */
+[data-skin="pixel"] .hud-row:is([aria-current="true"], [aria-current="page"], [aria-selected="true"]) .hud-icon-btn {
+  border-color: transparent;
+  color: var(--hud-bar-text);
+}
+[data-skin="pixel"] .hud-row:is([aria-current="true"], [aria-current="page"], [aria-selected="true"]) .hud-icon-btn:not(:disabled):hover {
+  background: var(--hud-bar-text);
+  color: var(--hud-bar);
+}
+
+/* ------------------------------------------------------------------
+   Indicators.
+   .hud-switch[role="switch"][aria-checked]  > .hud-switch__knob   lamp switch
+   .hud-lamp[data-state="on|off|warn|alert"]                      status lamp
+   .hud-gauge  style="--value: 0.72"                               fuel bar
+   .hud-tag                                                        value chip
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  cursor: pointer;
+}
+[data-skin="pixel"] .hud-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--hud-text-dim);
+  transition: transform 0.12s;
+}
+[data-skin="pixel"] .hud-switch[aria-checked="true"] {
+  background: var(--hud-green);
+  border-color: var(--hud-green);
+}
+[data-skin="pixel"] .hud-switch[aria-checked="true"] .hud-switch__knob {
+  transform: translateX(14px);
+  background: var(--hud-bar-text);
+}
+[data-skin="pixel"] .hud-switch:not(:disabled):hover { border-color: var(--hud-accent); }
+
+[data-skin="pixel"] .hud-lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+[data-skin="pixel"] .hud-lamp::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  background: var(--hud-text-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hud-bg) 40%, transparent);
+}
+[data-skin="pixel"] .hud-lamp[data-state="on"]::before { background: var(--hud-green); }
+[data-skin="pixel"] .hud-lamp[data-state="warn"]::before { background: var(--hud-yellow); }
+[data-skin="pixel"] .hud-lamp[data-state="alert"]::before { background: var(--hud-red); }
+
+[data-skin="pixel"] .hud-gauge {
+  --value: 0;
+  height: 12px;
+  border: 1px solid var(--hud-border);
+  background:
+    repeating-linear-gradient(to right, var(--hud-green) 0 3px, transparent 3px 5px) 2px 2px / calc((100% - 4px) * var(--value)) 6px no-repeat,
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--hud-text-dim) 25%, transparent) 0 3px, transparent 3px 5px) 2px 2px / calc(100% - 4px) 6px no-repeat,
+    var(--hud-panel);
+}
+[data-skin="pixel"] .hud-gauge[data-state="warn"] {
+  background:
+    repeating-linear-gradient(to right, var(--hud-yellow) 0 3px, transparent 3px 5px) 2px 2px / calc((100% - 4px) * var(--value)) 6px no-repeat,
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--hud-text-dim) 25%, transparent) 0 3px, transparent 3px 5px) 2px 2px / calc(100% - 4px) 6px no-repeat,
+    var(--hud-panel);
+}
+
+[data-skin="pixel"] .hud-gauge[data-state="alert"] {
+  background:
+    repeating-linear-gradient(to right, var(--hud-red) 0 3px, transparent 3px 5px) 2px 2px / calc((100% - 4px) * var(--value)) 6px no-repeat,
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--hud-text-dim) 25%, transparent) 0 3px, transparent 3px 5px) 2px 2px / calc(100% - 4px) 6px no-repeat,
+    var(--hud-panel);
+}
+
+[data-skin="pixel"] .hud-tag {
+  display: inline-block;
+  padding: 0 4px;
+  color: var(--hud-yellow);
+  background: color-mix(in srgb, var(--hud-yellow) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hud-yellow) 35%, transparent);
+}
+
+/* ------------------------------------------------------------------
+   Code blocks and tables.
+   .hud-code > .hud-code__header + pre       a framed block with a soft head
+   table.hud-table                           ruled table with a soft head
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-code { border: 1px solid var(--hud-border); background: color-mix(in srgb, var(--hud-bg) 92%, var(--hud-panel)); }
+[data-skin="pixel"] .hud-code > pre { margin: 0; padding: 10px 12px; overflow: auto; }
+[data-skin="pixel"] .hud-code__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  background: var(--hud-bar-soft);
+  border-bottom: 1px solid var(--hud-bar-line);
+  color: var(--hud-text-muted);
+}
+[data-skin="pixel"] .hud-code__header .hud-btn {
+  padding: 0 6px;
+  border-color: var(--hud-bar-line);
+  color: var(--hud-text-muted);
+}
+
+[data-skin="pixel"] .hud-table { border-collapse: collapse; border: 1px solid var(--hud-border); }
+[data-skin="pixel"] .hud-table :is(th, td) { padding: 6px 10px; text-align: left; border-bottom: 1px solid color-mix(in srgb, var(--hud-border) 60%, transparent); }
+[data-skin="pixel"] .hud-table thead th {
+  background: var(--hud-bar-soft);
+  color: var(--hud-text);
+  font-weight: 400;
+  border-bottom-color: var(--hud-bar-line);
+}
+
+/* ------------------------------------------------------------------
+   Prose (rendered Markdown, articles): wrap it in .hud-prose.
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-prose :is(h1, h2, h3, h4) {
+  color: var(--hud-accent);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+[data-skin="pixel"] .hud-prose :is(h1, h2) {
+  border-bottom: 1px dashed var(--hud-border);
+  padding-bottom: 4px;
+}
+[data-skin="pixel"] .hud-prose :is(strong, b) { color: var(--hud-green); font-weight: 400; }
+[data-skin="pixel"] .hud-prose a { color: var(--hud-accent); text-decoration: underline dotted; text-underline-offset: 3px; }
+[data-skin="pixel"] .hud-prose :not(pre) > code {
+  padding: 0 4px;
+  color: var(--hud-yellow);
+  background: color-mix(in srgb, var(--hud-yellow) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hud-yellow) 35%, transparent);
+}
+[data-skin="pixel"] .hud-prose blockquote {
+  margin-left: 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--hud-orange);
+  background: color-mix(in srgb, var(--hud-orange) 7%, transparent);
+  color: var(--hud-text-muted);
+}
+[data-skin="pixel"] .hud-prose li::marker { color: var(--hud-green); }
+[data-skin="pixel"] .hud-prose hr { border: 0; border-top: 1px dashed var(--hud-border); }
+[data-skin="pixel"] .hud-prose table { border-collapse: collapse; border: 1px solid var(--hud-border); }
+[data-skin="pixel"] .hud-prose :is(th, td) { padding: 6px 10px; border-bottom: 1px solid color-mix(in srgb, var(--hud-border) 60%, transparent); }
+[data-skin="pixel"] .hud-prose thead th { background: var(--hud-bar-soft); font-weight: 400; border-bottom-color: var(--hud-bar-line); }
+[data-skin="pixel"] .hud-prose pre { padding: 10px 12px; border: 1px solid var(--hud-border); background: color-mix(in srgb, var(--hud-bg) 92%, var(--hud-panel)); overflow: auto; }
+
+/* ------------------------------------------------------------------
+   Terminal input and the block caret (pixel-caret.js).
+   .hud-input        a framed input row
+   [data-pixel-caret] on a textarea/input: the script draws a 3px block caret
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-input {
+  border: 1px solid var(--hud-accent);
+  box-shadow: 0 0 0 1px var(--hud-bg), 0 0 0 2px color-mix(in srgb, var(--hud-accent) 25%, transparent);
+  background: var(--hud-bg);
+}
+[data-skin="pixel"] [data-pixel-caret].has-pixel-caret { caret-color: transparent; }
+.pixel-caret {
+  position: fixed;
+  z-index: 2147482000;
+  width: 3px;
+  background: var(--hud-green);
+  pointer-events: none;
+  animation: pixel-caret-blink 1.06s steps(1, end) infinite;
+}
+@keyframes pixel-caret-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-caret { animation: none; }
+}
+
+/* ------------------------------------------------------------------
+   Segmented control: joined keys, the pressed one inverted.
+   .hud-segmented > button[aria-pressed="true"]
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-segmented { display: inline-flex; }
+[data-skin="pixel"] .hud-segmented > button {
+  font: inherit;
+  height: var(--hud-control-md);
+  padding: 0 var(--hud-space-3);
+  color: var(--hud-text);
+  background: transparent;
+  border: 1px solid var(--hud-border);
+  cursor: pointer;
+}
+[data-skin="pixel"] .hud-segmented > button + button { margin-left: -1px; }
+[data-skin="pixel"] .hud-segmented > button:hover { background: var(--hud-hover); }
+[data-skin="pixel"] .hud-segmented > button[aria-pressed="true"] {
+  position: relative;
+  background: var(--hud-bar);
+  border-color: var(--hud-bar);
+  color: var(--hud-bar-text);
+}
+[data-skin="pixel"] .hud-segmented.is-sm > button { height: var(--hud-control-sm); font-size: var(--hud-text-xs); }
+
+/* ------------------------------------------------------------------
+   Form fields: label above, help or error below.
+   .hud-field > label.hud-label + control + .hud-help | .hud-error
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-field { display: flex; flex-direction: column; gap: var(--hud-space-2); }
+[data-skin="pixel"] .hud-label { font-size: var(--hud-text-xs); color: var(--hud-text-muted); }
+[data-skin="pixel"] .hud-label .hud-required { color: var(--hud-yellow); margin-left: 2px; }
+[data-skin="pixel"] .hud-help { font-size: var(--hud-text-xs); color: var(--hud-text-dim); }
+[data-skin="pixel"] .hud-error { font-size: var(--hud-text-xs); color: var(--hud-red); }
+[data-skin="pixel"] .hud-error::before { content: "! "; }
+[data-skin="pixel"] :is(input, textarea, select)[aria-invalid="true"] { border-color: var(--hud-red); }
+[data-skin="pixel"] :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select) { height: var(--hud-control-md); }
+[data-skin="pixel"] :is(input, select).is-sm { height: var(--hud-control-sm); font-size: var(--hud-text-xs); }
+[data-skin="pixel"] :is(input, select).is-lg { height: var(--hud-control-lg); }
+[data-skin="pixel"] :is(input, textarea, select):disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Select: the native control with a pixel arrow. Wrap it in .hud-select. */
+[data-skin="pixel"] .hud-select { position: relative; display: inline-flex; }
+[data-skin="pixel"] .hud-select > select {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  padding-right: 26px;
+  cursor: pointer;
+}
+[data-skin="pixel"] .hud-select::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--hud-text-muted), var(--hud-text-muted)) 0 0 / 8px 2px no-repeat,
+    linear-gradient(var(--hud-text-muted), var(--hud-text-muted)) 2px 2px / 4px 2px no-repeat;
+}
+
+/* Checkbox and radio: square boxes (this framework has no circles); a radio's
+   mark is a smaller square, so the two stay apart. Native inputs, restyled. */
+[data-skin="pixel"] :is(.hud-check, .hud-radio) { display: inline-flex; align-items: center; gap: var(--hud-space-3); cursor: pointer; }
+[data-skin="pixel"] :is(.hud-check, .hud-radio) > input {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid var(--hud-border);
+  background: var(--hud-bg);
+  cursor: pointer;
+}
+[data-skin="pixel"] :is(.hud-check, .hud-radio) > input:hover { border-color: var(--hud-accent); }
+[data-skin="pixel"] .hud-check > input:checked { background: var(--hud-bg); box-shadow: inset 0 0 0 2px var(--hud-bg), inset 0 0 0 7px var(--hud-green); border-color: var(--hud-green); }
+[data-skin="pixel"] .hud-check > input:indeterminate { background: linear-gradient(var(--hud-green), var(--hud-green)) center / 8px 2px no-repeat var(--hud-bg); border-color: var(--hud-green); }
+[data-skin="pixel"] .hud-radio > input:checked { box-shadow: inset 0 0 0 3px var(--hud-bg), inset 0 0 0 7px var(--hud-green); border-color: var(--hud-green); }
+[data-skin="pixel"] :is(.hud-check, .hud-radio) > input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ------------------------------------------------------------------
+   Badge and keycap.
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: var(--hud-text-xs);
+  line-height: 1;
+  background: var(--hud-bar);
+  color: var(--hud-bar-text);
+}
+[data-skin="pixel"] :is(kbd, .hud-kbd) {
+  display: inline-block;
+  padding: 0 5px;
+  font-family: var(--hud-font-mono);
+  font-size: var(--hud-text-xs);
+  line-height: 18px;
+  color: var(--hud-text);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  border-bottom-width: 2px;
+}
+
+/* ------------------------------------------------------------------
+   Overlays: menu, tooltip, dialog, toast. Panel color, a 1px rule, the
+   hard shadow. They appear at once: no fade or scale.
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-menu {
+  min-width: 180px;
+  padding: var(--hud-space-1) 0;
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
+}
+[data-skin="pixel"] .hud-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--hud-space-3);
+  width: 100%;
+  min-height: var(--hud-control-md);
+  padding: 0 var(--hud-space-4);
+  font: inherit;
+  text-align: left;
+  color: var(--hud-text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+[data-skin="pixel"] .hud-menu__item:hover,
+[data-skin="pixel"] .hud-menu__item:focus-visible { background: var(--hud-bar); color: var(--hud-bar-text); outline: none; }
+[data-skin="pixel"] .hud-menu__item[aria-checked="true"]::before { content: "✓"; color: var(--hud-green); }
+[data-skin="pixel"] .hud-menu__item[aria-checked="true"]:hover::before { color: inherit; }
+[data-skin="pixel"] .hud-menu__item[aria-checked="false"]::before { content: ""; width: 1ch; }
+[data-skin="pixel"] .hud-menu__item.is-danger { color: var(--hud-red); }
+[data-skin="pixel"] .hud-menu__item.is-danger:hover { background: var(--hud-red); color: #fff; }
+[data-skin="pixel"] .hud-menu__item:disabled { opacity: 0.4; cursor: not-allowed; background: transparent; color: var(--hud-text); }
+[data-skin="pixel"] .hud-menu__shortcut { margin-left: auto; font-size: var(--hud-text-xs); color: var(--hud-text-dim); }
+[data-skin="pixel"] .hud-menu__item:hover .hud-menu__shortcut { color: inherit; }
+[data-skin="pixel"] .hud-menu__sep { height: 0; margin: var(--hud-space-2) 0; border-top: 1px dashed var(--hud-border); }
+
+[data-skin="pixel"] .hud-tooltip {
+  display: inline-block;
+  max-width: 260px;
+  padding: 2px var(--hud-space-3);
+  font-size: var(--hud-text-xs);
+  background: var(--hud-bar);
+  color: var(--hud-bar-text);
+  box-shadow: var(--hud-shadow);
+}
+
+[data-skin="pixel"] .hud-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--hud-space-5);
+  background: color-mix(in srgb, #000 45%, transparent);
+}
+[data-skin="pixel"] .hud-dialog {
+  width: min(480px, 100%);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
+}
+[data-skin="pixel"] .hud-dialog__body { padding: var(--hud-space-5); }
+[data-skin="pixel"] .hud-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--hud-space-3);
+  padding: var(--hud-space-3) var(--hud-space-5) var(--hud-space-5);
+}
+
+[data-skin="pixel"] .hud-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--hud-space-3);
+  min-width: 240px;
+  max-width: 380px;
+  padding: var(--hud-space-3) var(--hud-space-4);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow), inset 3px 0 0 var(--_toast, var(--hud-accent));
+}
+[data-skin="pixel"] .hud-toast[data-state="on"] { --_toast: var(--hud-green); }
+[data-skin="pixel"] .hud-toast[data-state="warn"] { --_toast: var(--hud-yellow); }
+[data-skin="pixel"] .hud-toast[data-state="alert"] { --_toast: var(--hud-red); }
+[data-skin="pixel"] .hud-toast .hud-btn { margin-left: auto; }
+[data-skin="pixel"] .hud-toasts {
+  position: fixed;
+  right: var(--hud-space-5);
+  bottom: var(--hud-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-space-3);
+  z-index: 1000;
+}
+
+/* ------------------------------------------------------------------
+   Loading, empty state, divider.
+   ------------------------------------------------------------------ */
+[data-skin="pixel"] .hud-loader {
+  display: inline-block;
+  width: 22px;
+  height: 6px;
+  background:
+    linear-gradient(var(--hud-accent), var(--hud-accent)) 0 0 / 6px 6px no-repeat,
+    linear-gradient(var(--hud-accent), var(--hud-accent)) 8px 0 / 6px 6px no-repeat,
+    linear-gradient(var(--hud-accent), var(--hud-accent)) 16px 0 / 6px 6px no-repeat;
+  animation: hud-busy 0.9s steps(3, end) infinite;
+}
+[data-skin="pixel"] .hud-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hud-space-4);
+  padding: var(--hud-space-7) var(--hud-space-5);
+  color: var(--hud-text-dim);
+  text-align: center;
+}
+[data-skin="pixel"] .hud-empty__text::before { content: "[ "; }
+[data-skin="pixel"] .hud-empty__text::after { content: " ]"; }
+[data-skin="pixel"] :is(hr, .hud-divider) { height: 0; margin: var(--hud-space-5) 0; border: 0; border-top: 1px dashed var(--hud-border); }
+
+/* Icons: square caps and mitred joins match the pixel type. */
+[data-skin="pixel"] .hud-icon { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; }
+[data-skin="pixel"] .hud-icon.is-sm { width: 12px; height: 12px; }
+[data-skin="pixel"] .hud-icon.is-lg { width: 16px; height: 16px; }
+
+/* Numbers that should line up. */
+[data-skin="pixel"] .hud-num { font-family: var(--hud-font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-skin="pixel"] .hud-loader,
+  [data-skin="pixel"] .hud-btn[aria-busy="true"]::after { animation: none; }
+}

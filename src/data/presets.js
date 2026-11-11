@@ -15,6 +15,37 @@ function headquartersPreset(name, rank, personnel) {
   return { name, rank, type: "headquarters", role: "指挥与参谋", strength: [count, count], personnel };
 }
 
+// Editable sample crews, not a historical or model-specific establishment.
+const equipmentKinds = {
+  signal: { name: "电台", unit: "部", roles: [["报务员", 1], ["机务员", 1]] },
+  tank: { name: "坦克", unit: "辆", roles: [["车长", 1], ["炮长", 1], ["装填手", 1], ["驾驶员", 1], ["无线电员", 1]] },
+  artillery: { name: "火炮", unit: "门", roles: [["炮长", 1], ["瞄准手", 1], ["装填手", 2], ["弹药手", 2]] },
+  truck: { name: "卡车", unit: "辆", roles: [["驾驶员", 1], ["副驾驶员", 1]] },
+  armoredRecon: { name: "装甲侦察车", unit: "辆", roles: [["车长", 1], ["驾驶员", 1], ["炮手", 1], ["无线电员", 1]] },
+  assaultGun: { name: "突击炮", unit: "辆", roles: [["车长", 1], ["炮长", 1], ["装填手", 1], ["驾驶员", 1]] },
+  selfPropelledArtillery: { name: "自行火炮", unit: "辆", roles: [["车长", 1], ["炮长", 1], ["装填手", 2], ["驾驶员", 1]] },
+};
+
+function equipmentPreset(kind) {
+  const definition = equipmentKinds[kind];
+  const personnel = definition.roles.map(([role, count]) => ({ role, count, officer: false }));
+  const people = personnelTotal(personnel);
+  return { name: definition.name, type: kind, rank: "team", equipment: { kind },
+    role: "单件装备 · 示例定员，可按型号修改", strength: [people, people], personnel };
+}
+
+function ownEquipment(item) {
+  return equipmentKinds[item.equipment?.kind] ? { [item.equipment.kind]: 1 } : {};
+}
+
+function addEquipment(target, source, quantity = 1) {
+  for (const [kind, count] of Object.entries(source)) target[kind] = (target[kind] ?? 0) + count * quantity;
+}
+
+function equipmentSummary(counts) {
+  return Object.entries(counts).map(([kind, count]) => `${equipmentKinds[kind].name} ${count.toLocaleString()} ${equipmentKinds[kind].unit}`).join(" · ");
+}
+
 const mobileBranches = {
   tank: { name: "坦克", crew: 5 },
   mechanized: { name: "装甲步兵" },
@@ -157,7 +188,7 @@ for (const [type, { name, crew }] of Object.entries(mobileBranches)) {
   const crewKey = `form-${type}-team`;
   const platoonKey = `form-${type}-platoon`;
   if (crew) {
-    builtInPresets[crewKey] = { name: `${name}车组`, type, rank: "team", role: "车辆乘员", strength: [crew, crew] };
+    builtInPresets[crewKey] = equipmentPreset(type);
   }
   builtInPresets[platoonKey] = {
     name: `${name}排`, type, rank: "platoon", role: "机动分队",
@@ -168,9 +199,52 @@ for (const [type, { name, crew }] of Object.entries(mobileBranches)) {
   };
 }
 
+builtInPresets["form-artillery-team"] = equipmentPreset("artillery");
+builtInPresets["form-truck-team"] = equipmentPreset("truck");
+builtInPresets["form-signal-team"] = equipmentPreset("signal");
+
+// Equipment formations are editable examples, not a dated historical establishment.
+for (const [type, name] of [["artillery", "炮兵"], ["logistics", "辎重"]]) {
+  for (const rank of ["platoon", "company", "battalion"]) {
+    const source = structuredClone(builtInPresets[`form-${rank}-hq`]);
+    builtInPresets[`form-${type}-${rank}-hq`] = {
+      ...source, name: `${name}${{ platoon: "排部", company: "连部", battalion: "营部" }[rank]}`,
+      role: "指挥与勤务 · 示例定员",
+    };
+  }
+}
+Object.assign(builtInPresets, {
+  "form-artillery-platoon": {
+    name: "炮兵排", type: "artillery", rank: "platoon", role: "装备编成示例 · 每门炮配一辆牵引卡车",
+    parts: [["form-artillery-platoon-hq", 1], ["form-artillery-team", 2], ["form-truck-team", 2]],
+  },
+  "form-artillery-company": {
+    name: "炮兵连", type: "artillery", rank: "company", role: "装备编成示例 · 下辖两个炮兵排",
+    parts: [["form-artillery-company-hq", 1], ["form-artillery-platoon", 2]],
+  },
+  "form-artillery-battalion": {
+    name: "炮兵营", type: "artillery", rank: "battalion", role: "装备编成与定员为示例",
+    parts: [["form-artillery-battalion-hq", 1], ["form-artillery-company", 3]],
+  },
+  "form-logistics-platoon": {
+    name: "辎重排", type: "logistics", rank: "platoon", role: "汽车运输编成示例 · 下辖三辆卡车",
+    parts: [["form-logistics-platoon-hq", 1], ["form-truck-team", 3]],
+  },
+  "form-logistics-company": {
+    name: "辎重连", type: "logistics", rank: "company", role: "汽车运输编成示例 · 下辖三个辎重排",
+    parts: [["form-logistics-company-hq", 1], ["form-logistics-platoon", 3]],
+  },
+  "form-logistics-battalion": {
+    name: "辎重营", type: "logistics", rank: "battalion", role: "汽车运输编成与定员为示例",
+    parts: [["form-logistics-battalion-hq", 1], ["form-logistics-company", 3]],
+  },
+});
+
 const formationGroups = [
   { name: "班组与分队", keys: ["form-team", "form-crew", "form-squad", "form-guard-squad", "form-section", "form-section-squad", "form-platoon"] },
+  { name: "单件装备与乘员", keys: Object.keys(equipmentKinds).map(type => `form-${type}-team`) },
   { name: "战术单位", keys: ["form-company", "form-infantry-company", "form-battalion", "form-regiment", "form-guard-company"] },
+  { name: "炮兵与运输", keys: ["form-artillery-platoon", "form-artillery-company", "form-artillery-battalion", "form-logistics-platoon", "form-logistics-company", "form-logistics-battalion"] },
   { name: "指挥机构", keys: ["form-platoon-hq", "form-company-hq", ...higherCommands.map(({ formation }) => `${formation}-hq`), "form-staff"] },
   { name: "装甲与机动", keys: Object.keys(mobileBranches).map((type) => `form-${type}-company`) },
   { name: "编队与指挥", keys: ["form-brigade", "form-division", "form-corps", "form-field-army", "form-army-group", "form-theatre"] },
@@ -224,6 +298,7 @@ function presetStats(definitions, root, memo = new Map()) {
   const known = fixedStrength(preset.strength);
   const stat = {
     size: 1, depth: 1,
+    equipment: ownEquipment(preset),
     people: known ? preset.strength[0] : 0,
     officers: officerTotal(preset.personnel),
     estimated: Boolean(preset.estimated),
@@ -234,6 +309,7 @@ function presetStats(definitions, root, memo = new Map()) {
     stat.size += child.size * count;
     stat.depth = Math.max(stat.depth, child.depth + 1);
     stat.people += child.people * count;
+    addEquipment(stat.equipment, child.equipment, count);
     stat.officers += child.officers * count;
     stat.estimated ||= child.estimated;
     stat.known ||= child.known;
@@ -241,4 +317,44 @@ function presetStats(definitions, root, memo = new Map()) {
   }
   memo.set(root, stat);
   return stat;
+}
+
+// These complete the existing New Fourth Army diagram with editable illustrative staffing.
+const newFourthDirectBranches = {
+  'new-fourth-army-hq': 'n4-direct-hq',
+  'n4-special-battalion': 'n4-direct-special',
+  'n4-school': 'n4-direct-school',
+  'n4-logistics': 'n4-direct-logistics',
+};
+
+function newFourthDirectPresets() {
+  const definitions = {};
+  for (const key of ['form-battalion', 'form-logistics-platoon', 'form-signal-team', 'form-section']) {
+    Object.assign(definitions, structuredClone(presetTree(builtInPresets, key)));
+  }
+  function staff(key, name, rank, roles, parts = []) {
+    definitions[key] = { ...headquartersPreset(name, rank, roles.map(([role, count, officer = false]) => ({ role, count, officer }))),
+      parts, estimated: true, role: '补充编成与定员为示例' };
+  }
+  function team(key, name, type, people) {
+    definitions[key] = { name, type, rank:'team', strength:[people,people], estimated:true, role:'基层人员组 · 示例定员' };
+  }
+  team('n4-publicity-team', '宣传组', 'general', 4);
+  team('n4-repair-team', '修理组', 'engineer', 4);
+  team('n4-medical-team', '医疗组', 'medical', 5);
+  definitions['n4-warehouse-squad'] = {name:'仓储班',type:'logistics',rank:'squad',strength:[9,9],estimated:true,role:'仓储与装卸 · 示例定员'};
+  definitions['n4-signal-platoon'] = {name:'通信排',type:'signal',rank:'platoon',estimated:true,role:'电台与操作人员为示例',
+    parts:[['form-platoon-hq',1],['form-signal-team',3]]};
+  staff('n4-direct-hq','军部','corps', [['军长',1,true],['副军长',1,true],['勤务员',2]], [['n4-direct-staff',1],['n4-direct-political',1]]);
+  staff('n4-direct-staff','司令部','none', [['参谋长',1,true],['副参谋长',1,true],['参谋',4,true],['通信员',2],['文书',4]], [['n4-signal-platoon',1]]);
+  staff('n4-direct-political','政治部','none', [['主任',1,true],['副主任',1,true],['干事',4],['文书',2]], [['n4-direct-field-service',1]]);
+  staff('n4-direct-field-service','战地服务团','regiment', [['团长',1,true],['勤务员',2]], [['n4-publicity-team',3]]);
+  definitions['n4-direct-special'] = { ...definitions['form-battalion'], name:'军部特务营',type:'specialService',estimated:true,role:'下级编成与定员为示例' };
+  staff('n4-school-staff','教导队部','company', [['教官',2,true],['勤务员',2]]);
+  definitions['n4-student-section'] = { ...definitions['form-section'],name:'学员小队',type:'training',estimated:true };
+  definitions['n4-direct-school'] = { ...headquartersPreset('军部教导队','company',[{role:'筹办',count:1,officer:true}]),type:'training',estimated:true,
+    role:'下级编成与定员为示例', parts:[['n4-school-staff',1],['n4-student-section',3]] };
+  staff('n4-direct-logistics','总兵站','none', [['站长',1,true],['军需员',2],['文书',2]],
+    [['form-logistics-platoon',1],['n4-warehouse-squad',1],['n4-repair-team',1],['n4-medical-team',1]]);
+  return definitions;
 }

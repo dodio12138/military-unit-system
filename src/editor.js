@@ -3,402 +3,6 @@
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
 const unitsLayer = $("units");
-const svgNamespace = "http://www.w3.org/2000/svg";
-const storageKey = "military-unit-system:v2";
-const legacyKey = "military-unit-system:v1";
-const infantryExampleId = "example-infantry-company";
-const battalionExampleId = "example-infantry-battalion";
-const completeDivisionId = "example-115-complete";
-const armyExampleId = "example-eighth-route-army";
-const newFourthArmyExampleId = "example-new-fourth-army";
-const wholePresetStorageKey = "military-unit-system:whole-presets:v1";
-const maxFullExpansion = 400;
-
-const icons = {
-  undo: '<path d="M8 5 3 10l5 5M3 10h11a6 6 0 0 1 6 6v2"/>',
-  redo: '<path d="m16 5 5 5-5 5m5-5H10a6 6 0 0 0-6 6v2"/>',
-  pencil: '<path d="m15 5 4 4M4 20l4-.8L20 7l-4-4L4 15.2Z"/>',
-  layout: '<path d="M12 8v4M5 16v-4h14v4"/><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/>',
-  diagram: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 8v4M7 16v-4h10v4"/>',
-  library: '<path d="M4 8h16v12H4zM6 4h12M8 12h8"/>',
-  chevron: '<path d="m6 9 6 6 6-6"/>',
-  cursor: '<path d="m5 3 14 10-7 .8-3 6.2L5 3Z"/>',
-  hand: '<path d="M8 12V5a1.5 1.5 0 0 1 3 0v5-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v6a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-2.5L3.5 14a1.7 1.7 0 0 1 2.6-2.1L8 14"/>',
-  fit: '<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
-  check: '<path d="m5 12 4 4L19 6"/>',
-  "empty-square": '<rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="2.5 2.5"/>',
-  branch: '<rect x="3" y="3" width="7" height="5" rx="1"/><path d="M6.5 8v9H13"/><rect x="13" y="14" width="8" height="6" rx="1"/>',
-  grip: '<circle cx="10" cy="6" r=".7"/><circle cx="14" cy="6" r=".7"/><circle cx="10" cy="12" r=".7"/><circle cx="14" cy="12" r=".7"/><circle cx="10" cy="18" r=".7"/><circle cx="14" cy="18" r=".7"/>',
-  trash: '<path d="M4 7h16m-14 0 1 13h10l1-13M9 7V4h6v3m-5 4v5m4-5v5"/>',
-  lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
-  download: '<path d="M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5"/>',
-};
-
-const infantryCross = '<path d="M1 1 75 47M75 1 1 47"/>';
-const tracks = '<ellipse cx="38" cy="24" rx="21" ry="11"/>';
-const shieldMark = '<path d="M29 17q5 2 9-1 4 3 9 1v6q0 8-9 11-9-3-9-11Z"/>';
-const types = {
-  general: { name: "通用", rank: "none", drawing: "" },
-  infantry: { name: "步兵", rank: "company", drawing: infantryCross },
-  independent: { name: "独立步兵", rank: "regiment", drawing: '<path d="M1 1 75 47M75 1 1 47M32 5v7m-3.5-3.5h7M44 5v7m-3.5-3.5h7"/>' },
-  cavalry: { name: "骑兵", rank: "battalion", drawing: '<path d="M1 47 75 1"/>' },
-  artillery: { name: "炮兵", rank: "battalion", drawing: '<circle class="dot" cx="38" cy="24" r="5"/>' },
-  engineer: { name: "工兵", rank: "battalion", drawing: '<path d="M25 19v10m0-5h26m0-5v10"/>' },
-  headquarters: { name: "指挥部", rank: "none", drawing: '<path d="M1 13h74"/>' },
-  logistics: { name: "辎重", rank: "battalion", drawing: '<circle cx="38" cy="24" r="9"/><path d="M29 24h18m-9-9v18m-6-15 12 12m0-12L32 30"/>' },
-  signal: { name: "通信", rank: "company", drawing: '<path d="m42 13-12 12h12l-9 11"/>' },
-  medical: { name: "医疗", rank: "company", drawing: '<path d="M38 14v20M28 24h20"/>' },
-  shield: { name: "盾形标记", rank: "battalion", drawing: shieldMark },
-  specialService: { name: "特务", rank: "battalion", drawing: shieldMark },
-  training: { name: "教导", rank: "battalion", drawing: '<circle cx="38" cy="24" r="13"/><path class="dot" d="m38 13 2.6 7.5 8 .2-6.3 4.9 2.3 7.7-6.6-4.6-6.6 4.6 2.3-7.7-6.3-4.9 8-.2Z"/>' },
-  tank: { name: mobileBranches.tank.name, rank: "company", drawing: tracks },
-  mechanized: { name: mobileBranches.mechanized.name, rank: "company", drawing: infantryCross + tracks },
-  motorized: { name: mobileBranches.motorized.name, rank: "company", drawing: infantryCross + '<circle cx="30" cy="39" r="3"/><circle cx="46" cy="39" r="3"/>' },
-  armoredRecon: { name: mobileBranches.armoredRecon.name, rank: "company", drawing: tracks + '<path d="M22 31 54 17"/>' },
-  assaultGun: { name: mobileBranches.assaultGun.name, rank: "company", drawing: tracks + '<path d="M29 24h18m0-6v12"/>' },
-  selfPropelledArtillery: { name: mobileBranches.selfPropelledArtillery.name, rank: "company", drawing: tracks + '<circle class="dot" cx="38" cy="24" r="5"/>' },
-};
-
-const ranks = {
-  none: { name: "无级别标记" },
-  team: { name: "火力小组／机组", crew: true },
-  squad: { name: "班／基层队", dots: 1 },
-  section: { name: "小队", dots: 2 },
-  platoon: { name: "排", dots: 3 },
-  company: { name: "连", bars: 1 },
-  battalion: { name: "营", bars: 2 },
-  regiment: { name: "团", bars: 3 },
-  brigade: { name: "旅", crosses: 1 },
-  division: { name: "师", crosses: 2 },
-  corps: { name: "军", crosses: 3 },
-  fieldArmy: { name: "野战集团军", crosses: 4 },
-  armyGroup: { name: "集团军群", crosses: 5 },
-  theatre: { name: "战区", crosses: 6 },
-};
-
-const groups = [
-  { name: "作战单位", keys: ["infantry", "independent", "cavalry", "artillery", "engineer", "shield"] },
-  { name: "装甲与机动", keys: Object.keys(mobileBranches) },
-  { name: "指挥与保障", keys: ["headquarters", "logistics", "training", "specialService", "signal", "medical"] },
-];
-
-function icon(name) {
-  return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
-}
-
-function rankMark(rank) {
-  const { dots, bars, crosses, crew } = ranks[rank];
-  const count = dots ?? bars ?? crosses ?? 0;
-  const width = Math.max(32, 9 * count);
-  const marks = Array.from({ length: count }, (_, index) => {
-    const x = width / 2 + (index - (count - 1) / 2) * (crosses ? 9 : 6);
-    if (dots) return `<circle cx="${x}" cy="8" r="1.45" fill="currentColor"/>`;
-    if (bars) return `<path d="M${x} 4v8"/>`;
-    return `<path d="m${x - 3} 5 6 6m0-6-6 6"/>`;
-  });
-  const crewMark = crew ? '<circle cx="16" cy="8" r="4"/><path d="m12 12 8-8"/>' : "";
-  return `<svg class="rank-mark" viewBox="0 0 ${width} 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true">${crewMark}${marks.join("")}</svg>`;
-}
-
-function symbol(type, stacked = false) {
-  const layers = stacked ? '<rect class="stack-frame" x="9" y="9" width="74" height="46"/><rect class="stack-frame" x="5" y="5" width="74" height="46"/>' : "";
-  return `<svg class="unit-symbol" viewBox="0 0 76 48" aria-hidden="true"><g class="symbol-ink">${layers}<rect class="symbol-frame" x="1" y="1" width="74" height="46"/>${types[type].drawing}</g></svg>`;
-}
-
-function previousExample() {
-  return {
-    title: "一一五师",
-    example: true,
-    units: [
-      { id: "115", name: "一一五师", type: "infantry", rank: "division", x: 412, y: 64, parent: null },
-      { id: "343", name: "第343旅", type: "infantry", rank: "brigade", x: 100, y: 208, parent: "115" },
-      { id: "344", name: "第344旅", type: "infantry", rank: "brigade", x: 300, y: 208, parent: "115" },
-      { id: "independent", name: "独立团", type: "infantry", rank: "regiment", x: 500, y: 208, parent: "115" },
-      { id: "staff", name: "师部", type: "headquarters", rank: "division", x: 700, y: 208, parent: "115" },
-      { id: "685", name: "第685团", type: "infantry", rank: "regiment", x: 124, y: 320, parent: "343" },
-      { id: "686", name: "第686团", type: "infantry", rank: "regiment", x: 124, y: 424, parent: "343" },
-      { id: "687", name: "第687团", type: "infantry", rank: "regiment", x: 324, y: 320, parent: "344" },
-      { id: "688", name: "第688团", type: "infantry", rank: "regiment", x: 324, y: 424, parent: "344" },
-      { id: "battalion", name: "步兵营", type: "infantry", rank: "battalion", x: 524, y: 320, parent: "independent" },
-      { id: "cavalry", name: "骑兵营", type: "cavalry", rank: "battalion", x: 724, y: 320, parent: "staff" },
-      { id: "artillery", name: "炮兵营", type: "artillery", rank: "battalion", x: 724, y: 424, parent: "staff" },
-    ],
-  };
-}
-
-const divisionReferences = {
-  "115": { name: "一一五师", brigades: [["343", "685", "686"], ["344", "687", "688"]], central: ["independent", "独立团", "independent"], support: "training" },
-  "120": { name: "一二〇师", brigades: [["358", "715", "716"], ["359", "717", "718"]], central: ["training-regiment", "教导团", "training"], support: "specialService" },
-  "129": { name: "一二九师", brigades: [["385", "769", "770"], ["386", "771", "772"]], central: ["training-regiment", "教导团", "training"], support: "specialService" },
-};
-
-function exampleChart(division = "115") {
-  const { name, brigades, central, support } = divisionReferences[division];
-  const units = [];
-  const stacks = {};
-  function plate(id, unitName, type, rank, x, y, parent, connector, plateLabel = "") {
-    units.push({ id, name: unitName, type, rank, x, y, parent, connector, plateLabel });
-  }
-  function battalions(parent, x, y) {
-    const ids = [];
-    for (let i = 0; i < 3; i++) {
-      const id = `${parent}-b${i + 1}`;
-      ids.push(id);
-      plate(id, `步兵营 ${i + 1}`, "infantry", "battalion", x, y + i * 96, parent, "left-rail");
-    }
-    stacks[ids[0]] = ids;
-  }
-  plate(division, name, "infantry", "division", 460, 76, null, "reference-root");
-  plate("staff", "师部指挥部", "headquarters", "none", 584, 176, division, "stem");
-  for (const [column, [brigade]] of brigades.entries()) {
-    plate(brigade, `第${brigade}旅`, "infantry", "brigade", 40 + column * 280, 304, division, "bus", brigade);
-  }
-  plate(...central, "regiment", 600, 304, division, "bus");
-  for (const [column, [brigade, ...regiments]] of brigades.entries()) {
-    for (const [row, regiment] of regiments.entries()) {
-      const x = 64 + column * 280;
-      const y = 400 + row * 192;
-      plate(regiment, `第${regiment}团`, "infantry", "regiment", x, y, brigade, "left-rail", regiment);
-      battalions(regiment, x + 24, y + 96);
-    }
-  }
-  battalions(central[0], 624, 400);
-  if (division === "115") plate("shield", "盾形标记营", "shield", "battalion", 344, 784, "344", "left-rail");
-  for (const [i, type] of ["cavalry", "artillery", "engineer", "logistics", support].entries()) {
-    plate(type, types[type].name + "营", type, "battalion", 904, 304 + i * 96, division, "right-rail");
-  }
-  return { id: `reference-${division}`, title: name, example: true, reference: true, referenceDivision: division, referenceLayoutVersion: 2, units, stacks };
-}
-
-function infantryExample(id, key, title, rootId) {
-  const definitions = presetTree(builtInPresets, key);
-  if (key === "form-company") {
-    definitions[key] = { ...definitions[key], name: "步兵连", type: "infantry" };
-    definitions["form-platoon"] = { ...definitions["form-platoon"], name: "步兵排", type: "infantry" };
-  }
-  const root = makePresetUnit(definitions[key], 0, 0, null, { snapshot: id, key });
-  root.id = rootId;
-  return {
-    id,
-    title,
-    headquartersVersion: 1,
-    showComposition: true,
-    units: [root],
-    recipes: { [id]: definitions },
-  };
-}
-
-function infantryCompanyExample() {
-  return infantryExample(infantryExampleId, "form-company", "步兵连编制示例", "infantry-company");
-}
-
-function infantryBattalionExample() {
-  return { ...infantryExample(battalionExampleId, "form-battalion", "步兵营编制示例", "infantry-battalion"), commandGuardVersion: 1 };
-}
-
-function completeDivisionExample(division = "115") {
-  const document = exampleChart(division);
-  const snapshot = `example-${division}-complete`;
-  document.id = snapshot;
-  document.title += "完整编制";
-  document.referenceComplete = true;
-  document.commandGuardVersion = 1;
-  document.referenceLayoutVersion = 2;
-  const definitions = presetTree(builtInPresets, "form-division");
-  if (division === "115") {
-    Object.assign(definitions, presetTree(builtInPresets, brigade344Guard));
-    definitions["reference-344-hq"] = { ...definitions["form-brigade-hq"], parts: [[brigade344Guard, 1]] };
-  } else {
-    definitions["form-division-hq"] = { ...definitions["form-division-hq"], parts: [], role: "师部机关 · 本部员额为示例" };
-  }
-  document.recipes = { [snapshot]: definitions };
-  const support = {
-    cavalry: { name: "骑兵", team: "骑兵班", rank: "squad", count: 9 },
-    artillery: { name: "炮兵", team: "炮组", rank: "team", count: 6 },
-    engineer: { name: "工兵", team: "工兵班", rank: "squad", count: 9 },
-    logistics: { name: "辎重", team: "辎重班", rank: "squad", count: 9 },
-    training: { name: "教导", team: "教导班", rank: "squad", count: 9 },
-    shield: { name: "直属", team: "直属班", rank: "squad", count: 9 },
-    specialService: { name: "特务", team: "特务班", rank: "squad", count: 9 },
-  };
-  for (const [type, { name, team, rank, count }] of Object.entries(support)) {
-    const keys = ["team", "platoon", "company", "battalion"].map((level) => `reference-${type}-${level}`);
-    definitions[keys[0]] = { name: team, type, rank, strength: [count, count] };
-    definitions[keys[1]] = { name: `${name}排`, type, rank: "platoon", parts: [["form-platoon-hq", 1], [keys[0], 3]] };
-    definitions[keys[2]] = { name: `${name}连`, type, rank: "company", parts: [["form-company-hq", 1], [keys[1], 3]] };
-    definitions[keys[3]] = { name: `${name}营`, type, rank: "battalion", parts: [["form-battalion-hq", 1], [keys[2], 3]] };
-  }
-  const added = [];
-  for (const unit of document.units) {
-    if (unit.id === "staff") {
-      const hq = definitions["form-division-hq"];
-      unit.rank = hq.rank;
-      unit.plateLabel = hq.name;
-      unit.strength = [...hq.strength];
-      unit.personnel = structuredClone(hq.personnel);
-      unit.role = hq.role;
-      if (hq.parts.length) unit.recipe = { snapshot, key: "form-division-hq" };
-    }
-    if (unit.rank === "battalion") {
-      const key = unit.parent === "training-regiment" ? "reference-training-battalion"
-        : support[unit.type] ? `reference-${unit.type}-battalion` : "form-battalion";
-      unit.recipe = { snapshot, key };
-      if (unit.parent === "training-regiment") {
-        unit.type = "training";
-        unit.name = unit.name.replace("步兵", "教导");
-      } else if (support[unit.type]) unit.plateLabel = unit.name;
-    }
-    if (unit.id === "independent") unit.plateLabel = unit.name;
-    if (unit.rank === "brigade" || unit.rank === "regiment") {
-      const key = unit.id === "344" ? "reference-344-hq" : `form-${unit.rank}-hq`;
-      const hq = makePresetUnit(definitions[key], unit.x + 136, unit.y, unit.id, { snapshot, key });
-      hq.id = `${unit.id}-hq`;
-      hq.plateLabel = definitions[key].name;
-      added.push(hq);
-    }
-  }
-  document.units.push(...added);
-  return document;
-}
-
-function historicalCommand(name, rank, roles) {
-  return { ...headquartersPreset(name, rank, roles.map((role) => ({ role, count: 1, officer: true }))),
-    role: "仅录入史料所列主要岗位", rosterOnly: true };
-}
-
-function eighthRouteArmyExample() {
-  const root = { id: "eighth-route-army", name: "八路军", type: "general", rank: "fieldArmy",
-    x: 460, y: 76, parent: null, connector: "reference-root", plateLabel: "八路军" };
-  const chart = { id: armyExampleId, title: "八路军总编制", reference: true, referenceArmy: true,
-    referenceLayoutVersion: 2, units: [root], recipes: {}, stacks: {}, folded: [] };
-
-  function add(id, definition, recipe) {
-    const unit = makePresetUnit(definition, 0, 0, root.id, recipe);
-    unit.id = id;
-    unit.plateLabel = unit.name;
-    chart.units.push(unit);
-    return unit;
-  }
-
-  add("army-hq", historicalCommand("总指挥部", "fieldArmy", [
-    "总指挥 朱德", "副总指挥 彭德怀", "参谋长 叶剑英", "副参谋长 左权",
-    "政治部主任 任弼时", "政治部副主任 邓小平",
-  ]));
-
-  for (const division of Object.keys(divisionReferences)) {
-    const example = completeDivisionExample(division);
-    const ids = new Map(example.units.map((unit) => [unit.id, `${division}:${unit.id}`]));
-    for (const unit of example.units) {
-      chart.units.push({ ...unit, id: ids.get(unit.id), parent: unit.parent ? ids.get(unit.parent) : root.id });
-    }
-    for (const [id, members] of Object.entries(example.stacks)) {
-      chart.stacks[ids.get(id)] = members.map((member) => ids.get(member));
-    }
-    Object.assign(chart.recipes, example.recipes);
-    chart.folded.push(ids.get(division));
-  }
-
-  const definitions = presetTree(builtInPresets, "form-battalion");
-  const regimentHQ = builtInPresets["form-regiment-hq"];
-  definitions["army-special-hq"] = { ...regimentHQ, parts: [], estimated: true };
-  definitions["army-special-regiment"] = {
-    name: "总部特务团", type: "specialService", rank: "regiment", estimated: true,
-    role: "总部直属部队，营以下编成及员额为示例",
-    parts: [["army-special-hq", 1], ["form-battalion", 3]],
-  };
-  chart.recipes[armyExampleId] = definitions;
-  add("army-special", definitions["army-special-regiment"], { snapshot: armyExampleId, key: "army-special-regiment" });
-  add("army-school", historicalCommand("总部随营学校", "none", ["校长 韦国清", "政治委员 张平凯"]));
-  add("army-rear", historicalCommand("后方总留守处", "none", ["主任 萧劲光"])).role =
-    "统一指挥留陕部队，相关部队按原建制列在各师";
-  arrangeReference(chart);
-  return chart;
-}
-
-function newFourthArmyExample() {
-  const rootId = "new-fourth-army";
-  const snapshot = newFourthArmyExampleId;
-  const definitions = presetTree(builtInPresets, "form-battalion");
-  for (const key of ["form-platoon", "form-company"]) Object.assign(definitions, presetTree(builtInPresets, key));
-  const document = { id: snapshot, title: "新四军总编制", reference: true, referenceNewFourthArmy: true,
-    referenceLayoutVersion: 2, units: [], recipes: { [snapshot]: definitions }, stacks: {}, folded: [] };
-
-  function add(id, parent, definition, key) {
-    const unit = makePresetUnit(definition, 0, 0, parent, key ? { snapshot, key } : undefined);
-    unit.id = id;
-    unit.plateLabel = unit.name;
-    document.units.push(unit);
-    return unit;
-  }
-
-  function exampleBranch(id, parent, name, type, key, role = "下级编成与员额为示例") {
-    return add(id, parent, { ...definitions[key], name, type, role, estimated: true }, key);
-  }
-
-  add(rootId, null, { name: "新四军", type: "general", rank: "corps", role: "国民革命军陆军新编第四军" });
-  const headquartersId = `${rootId}-hq`;
-  add(headquartersId, rootId, historicalCommand("军部", "corps", ["军长 叶挺", "副军长 项英"]));
-  add("n4-general-staff", headquartersId, historicalCommand("司令部", "none", ["参谋长 张云逸", "副参谋长 周子昆"]));
-  add("n4-political", headquartersId, historicalCommand("政治部", "none", ["主任 袁国平", "副主任 邓子恢"]));
-  add("n4-field-service", "n4-political", historicalCommand("战地服务团", "regiment", ["团长 朱克靖"]));
-  document.folded.push(headquartersId);
-
-  const detachments = [
-    { name: "第一支队", commander: "陈毅", deputy: "傅秋涛", regiments: [[1, "傅秋涛", 3], [2, "张正坤", 3]] },
-    { name: "第二支队", commander: "张鼎丞", deputy: "粟裕", regiments: [[3, "黄火星", 3], [4, "卢胜", 3]] },
-    { name: "第三支队", commander: "张云逸", deputy: "谭震林", regiments: [[5, "饶守坤", 3], [6, "叶飞", 3]] },
-    { name: "第四支队", commander: "高敬亭", regiments: [[7, "杨克志", 2, "曹玉福"], [8, "周骏鸣", 3, "林恺"], [9, "顾士多", 2, "高志荣"]] },
-  ];
-  for (const [index, detachment] of detachments.entries()) {
-    const id = `n4-detachment-${index + 1}`;
-    add(id, rootId, { name: detachment.name, type: "infantry", rank: "brigade" });
-    const roles = [`司令员 ${detachment.commander}`];
-    if (detachment.deputy) roles.push(`副司令员 ${detachment.deputy}`);
-    add(`${id}-hq`, id, historicalCommand("支队部", "brigade", roles));
-    document.folded.push(id);
-    for (const [number, commander, battalions, political] of detachment.regiments) {
-      const regimentId = `n4-regiment-${number}`;
-      const role = number === 8 ? "按桐柏山独立团改编时的三营记载呈现" : undefined;
-      add(regimentId, id, { name: `第${number}团`, type: "infantry", rank: "regiment", role });
-      const posts = [`团长 ${commander}`];
-      if (political) posts.push(`政治委员 ${political}`);
-      add(`${regimentId}-hq`, regimentId, historicalCommand("团部", "regiment", posts));
-      for (let battalion = 1; battalion <= battalions; battalion++) {
-        exampleBranch(`${regimentId}-b${battalion}`, regimentId, `第${battalion}营`, "infantry", "form-battalion");
-      }
-      document.folded.push(regimentId);
-    }
-  }
-  add("n4-pistol-regiment", "n4-detachment-4", {
-    name: "手枪团", type: "infantry", rank: "regiment", role: "三个分队参照方毅1938年任职时的回忆，分队以下编成与员额为示例",
-  });
-  add("n4-pistol-regiment-hq", "n4-pistol-regiment", historicalCommand("团部", "regiment", ["团长 詹化雨", "政治委员 汪少川"]));
-  for (let number = 1; number <= 3; number++) {
-    exampleBranch(`n4-pistol-company-${number}`, "n4-pistol-regiment", `第${number}分队`, "infantry", "form-company");
-  }
-  document.folded.push("n4-pistol-regiment");
-  exampleBranch("n4-detachment-4-messenger", "n4-detachment-4", "传令排", "signal", "form-platoon");
-  exampleBranch("n4-detachment-4-special", "n4-detachment-4", "特务连", "specialService", "form-company");
-  exampleBranch("n4-detachment-4-student", "n4-detachment-4", "学兵连", "training", "form-company");
-
-  exampleBranch("n4-special-battalion", rootId, "军部特务营", "specialService", "form-battalion",
-    "由湘南、闽中游击队改编，营以下编成与员额为示例");
-  add("n4-school", rootId, historicalCommand("军部教导队", "none", ["筹办 周子昆"])).role = "1938年2月开学";
-  add("n4-logistics", rootId, historicalCommand("总兵站", "none", ["站长 张元寿"]));
-  arrangeReference(document);
-  return document;
-}
-
-const additionalExamples = [
-  [infantryExampleId, infantryCompanyExample],
-  [battalionExampleId, infantryBattalionExample],
-  [completeDivisionId, completeDivisionExample],
-  ["example-120-complete", () => completeDivisionExample("120")],
-  ["example-129-complete", () => completeDivisionExample("129")],
-  [armyExampleId, eighthRouteArmyExample],
-  [newFourthArmyExampleId, newFourthArmyExample],
-];
-
 function readStorage(key) {
   try {
     return JSON.parse(localStorage.getItem(key));
@@ -409,140 +13,6 @@ function readStorage(key) {
 
 function isChart(value) {
   return value && typeof value.title === "string" && Array.isArray(value.units);
-}
-
-function migrateChartStrength(chart) {
-  for (const unit of chart.units) migrateDefaultStrength(unit);
-  for (const definitions of Object.values(chart.recipes ?? {})) {
-    for (const [key, preset] of Object.entries(definitions)) migrateDefaultStrength(preset, key);
-  }
-  return chart;
-}
-
-function migrateCommandGuards(document) {
-  if (document.commandGuardVersion) return;
-  document.commandGuardVersion = 1;
-  for (const definitions of Object.values(document.recipes ?? {})) {
-    const squad = definitions["form-guard-squad"];
-    if (squad?.role === "营部警卫 · 推定员额") squad.estimated = true;
-    if (!definitions["form-guard-company"]
-        || JSON.stringify(presetTree(definitions, "form-guard-company")) !== stockGuardTree) continue;
-    if (document.referenceComplete) {
-      const headquarters = document.units.find((unit) => unit.id === "344-hq");
-      if (headquarters && recipeOf(headquarters, document) === definitions && headquarters.recipe.key === "form-brigade-hq"
-          && JSON.stringify(definitions["form-brigade-hq"].parts) === '[["form-guard-company",1]]') {
-        definitions["reference-344-hq"] = { ...definitions["form-brigade-hq"], parts: [[brigade344Guard, 1]] };
-        Object.assign(definitions, presetTree(builtInPresets, brigade344Guard));
-        headquarters.recipe.key = "reference-344-hq";
-      }
-    }
-    for (const [rank, guard] of Object.entries(commandGuards)) {
-      const headquarters = definitions[`form-${rank}-hq`];
-      if (JSON.stringify(headquarters?.parts) !== '[["form-guard-company",1]]') continue;
-      headquarters.parts = [[guard, 1]];
-      Object.assign(definitions, presetTree(builtInPresets, guard));
-    }
-  }
-  const byParent = new Map();
-  for (const unit of document.units) {
-    if (!byParent.has(unit.parent)) byParent.set(unit.parent, []);
-    byParent.get(unit.parent).push(unit);
-  }
-  function matchesStock(unit, key) {
-    const expected = builtInPresets[key];
-    if (unit.name.replace(/ \d+$/, "") !== expected.name
-        || ["type", "rank", "role", "strength", "personnel"].some((field) => JSON.stringify(unit[field]) !== JSON.stringify(expected[field]))) return false;
-    const recipe = recipeOf(unit, document);
-    if (recipe) return JSON.stringify(presetTree(recipe, unit.recipe.key)) === JSON.stringify(presetTree(builtInPresets, key));
-    const keys = (expected.parts ?? []).flatMap(([child, count]) => Array(count).fill(child));
-    const children = byParent.get(unit.id) ?? [];
-    return keys.length === children.length && children.every((child, index) => matchesStock(child, keys[index]));
-  }
-  const removed = new Set();
-  function removeChildren(id) {
-    for (const child of byParent.get(id) ?? []) {
-      removed.add(child.id);
-      removeChildren(child.id);
-    }
-  }
-  for (const headquarters of document.units.filter((unit) => unit.type === "headquarters" && commandGuards[unit.rank])) {
-    const key = document.referenceComplete && headquarters.id === "344-hq" ? brigade344Guard : commandGuards[headquarters.rank];
-    for (const guard of byParent.get(headquarters.id) ?? []) {
-      if (guard.role === "营部警卫 · 推定员额") guard.estimated = true;
-      if (!matchesStock(guard, "form-guard-company")) continue;
-      removeChildren(guard.id);
-      const definition = builtInPresets[key];
-      Object.assign(guard, { name: definition.name, rank: definition.rank, role: definition.role, estimated: true });
-      delete guard.strength;
-      delete guard.recipe;
-      delete guard.personnel;
-      if (definition.strength) guard.strength = [...definition.strength];
-      if (definition.parts) {
-        const snapshot = `command-guard:${key}`;
-        document.recipes ??= {};
-        document.recipes[snapshot] = presetTree(builtInPresets, key);
-        guard.recipe = { snapshot, key };
-        document.folded = document.folded?.filter((id) => id !== guard.id);
-      }
-    }
-  }
-  if (!removed.size) return document;
-  document.units = document.units.filter((unit) => !removed.has(unit.id));
-  if (document.folded) document.folded = document.folded.filter((id) => !removed.has(id));
-  if (document.expansionLocks) document.expansionLocks = document.expansionLocks.filter((id) => !removed.has(id));
-  if (document.stacks) document.stacks = Object.fromEntries(Object.entries(document.stacks)
-    .filter(([id]) => !removed.has(id)).map(([id, members]) => [id, members.filter((member) => !removed.has(member))]));
-  return document;
-}
-
-function migrateReferenceLayout(document) {
-  if (document.referenceLayoutVersion >= 2) return;
-  document.referenceLayoutVersion = 2;
-  arrangeReference(document);
-}
-
-function addDefaultHeadquarters(definition, key, catalog) {
-  const headquarters = `${key}-hq`;
-  const defaults = builtInPresets[key]?.parts;
-  const parts = definition?.parts;
-  if (defaults?.length !== 2 || defaults[0][0] !== headquarters || parts?.length !== 1) return false;
-  const [child, count] = parts[0];
-  const oldBattalion = key === "form-battalion" && child === "form-company";
-  if (child !== defaults[1][0] && !oldBattalion) return false;
-  if (oldBattalion && definition.name === "营" && definition.type === "general") {
-    definition.name = builtInPresets[key].name;
-    definition.type = builtInPresets[key].type;
-  }
-  definition.parts = [[headquarters, 1], [defaults[1][0], count]];
-  if (catalog && !catalog[headquarters]) catalog[headquarters] = structuredClone(builtInPresets[headquarters]);
-  return true;
-}
-
-function migrateInfantryHeadquarters(document) {
-  if (document.headquartersVersion) return document;
-  document.headquartersVersion = 1;
-  const recipe = document.recipes?.[infantryExampleId];
-  if (recipe) {
-    for (const key of ["form-company", "form-platoon"]) addDefaultHeadquarters(recipe[key], key, recipe);
-  }
-  const root = document.units.find((unit) => unit.id === "infantry-company");
-  if (!root) return document;
-  const parents = [root, ...document.units.filter((unit) => unit.parent === root.id && unit.rank === "platoon" && unit.type !== "headquarters")];
-  for (const parent of parents) {
-    if (recipeOf(parent, document) || document.units.some((unit) => unit.parent === parent.id && unit.type === "headquarters")) continue;
-    const definition = builtInPresets[parent === root ? "form-company-hq" : "form-platoon-hq"];
-    const x = parent.x + 56;
-    let y = parent.y + 80;
-    if (document.manualLayout) {
-      while (document.units.some((unit) => Math.abs(unit.x - x) < 112 && Math.abs(unit.y - y) < 76)) y += 80;
-    } else {
-      for (const unit of document.units) if (unit.y >= y) unit.y += 80;
-    }
-    const headquarters = makePresetUnit(definition, x, y, parent.id);
-    headquarters.id = `${parent.id}-headquarters`;
-    document.units.splice(document.units.indexOf(parent) + 1, 0, headquarters);
-  }
-  return document;
 }
 
 function readPresetOverrides() {
@@ -567,6 +37,8 @@ function readLibrary() {
       migrateChartStrength(item);
       if (item.id === battalionExampleId || item.referenceComplete) migrateCommandGuards(item);
       if (item.reference) migrateReferenceLayout(item);
+      migrateSupportEquipment(item);
+      migrateNewFourthDirectUnits(item);
       return item.id === infantryExampleId ? migrateInfantryHeadquarters(item) : item;
     });
   for (const [id, create] of additionalExamples) {
@@ -699,8 +171,9 @@ function anyUnitVisible() {
 }
 
 function isUnitVisible(unit) {
-  const x = unit.x * view.scale + view.x;
-  const y = unit.y * view.scale + view.y;
+  const projected = projectPoint(unit, displayMode);
+  const x = projected.x * view.scale + view.x;
+  const y = projected.y * view.scale + view.y;
   return x >= 38 * view.scale && y >= 42 * view.scale
     && x <= stage.clientWidth - 38 * view.scale && y <= stage.clientHeight - (chart.showComposition ? 88 : 56) * view.scale;
 }
@@ -746,9 +219,20 @@ function isStaffedLeaf(unit) {
   return (isBasicRank(unit.rank) || unit.type === "headquarters") && fixedStrength(unit.strength);
 }
 
+function supportsPersonnel(unit) {
+  return unit?.type === "headquarters" || Boolean(unit?.equipment) || Boolean(unit?.personnel?.length);
+}
+
+function validEquipment(unit) {
+  return !unit.equipment || (equipmentKinds[unit.equipment.kind] && unit.equipment.kind === unit.type
+    && unit.rank === "team" && !unit.parts?.length && unit.personnel?.length
+    && fixedStrength(unit.strength) && personnelTotal(unit.personnel) === unit.strength[0]);
+}
+
 function staffedPreset(definitions, key, memo = new Map()) {
   if (memo.has(key)) return memo.get(key);
   const preset = definitions[key];
+  if (!validEquipment(preset)) return false;
   if (preset.strength && !fixedStrength(preset.strength)) return false;
   const staffed = preset.parts?.length
     ? preset.parts.every(([child]) => staffedPreset(definitions, child, memo))
@@ -792,6 +276,7 @@ function strengthOf(unit, byParent) {
   const known = !unit.rosterOnly && fixedStrength(unit.strength);
   const stat = {
     people: known ? unit.strength[0] : 0,
+    equipment: ownEquipment(unit),
     officers: unit.rosterOnly ? 0 : officerTotal(unit.personnel),
     known, incomplete: Boolean(unit.rosterOnly) || (!known && (Boolean(unit.strength) || !children.length)),
     estimated: Boolean(unit.estimated),
@@ -799,6 +284,7 @@ function strengthOf(unit, byParent) {
   for (const child of children) {
     const nested = strengthOf(child, byParent);
     stat.people += nested.people;
+    addEquipment(stat.equipment, nested.equipment);
     stat.officers += nested.officers;
     stat.estimated ||= nested.estimated;
     stat.known ||= nested.known;
@@ -825,11 +311,23 @@ function compositionOf(unit, byParent) {
   };
 }
 
+function personnelSignature(personnel) {
+  const counts = new Map();
+  for (const entry of personnel ?? []) {
+    const role = entry.role.trim().split(/\s+/)[0];
+    const key = JSON.stringify([role, Boolean(entry.officer)]);
+    counts.set(key, (counts.get(key) ?? 0) + entry.count);
+  }
+  return JSON.stringify([...counts].sort(([a], [b]) => a.localeCompare(b)));
+}
+
 function sameStackKind(a, b) {
   return a.parent === b.parent && a.type === b.type && a.rank === b.rank
-    && String(a.strength ?? "") === String(b.strength ?? "") && a.role === b.role
+    && a.equipment?.kind === b.equipment?.kind
+    && String(a.strength ?? "") === String(b.strength ?? "")
     && Boolean(a.estimated) === Boolean(b.estimated)
-    && JSON.stringify(a.personnel ?? []) === JSON.stringify(b.personnel ?? []);
+    && Boolean(a.rosterOnly) === Boolean(b.rosterOnly)
+    && personnelSignature(a.personnel) === personnelSignature(b.personnel);
 }
 
 function stackSignature(children, document = chart) {
@@ -840,7 +338,9 @@ function stackSignature(children, document = chart) {
     const counts = new Map();
     for (const [id, count] of parts) counts.set(id, (counts.get(id) ?? 0) + count);
     const key = JSON.stringify([
-      item.type, item.rank, item.role || "", item.strength || null, item.personnel ?? [], Boolean(item.estimated),
+      item.type, item.rank, item.strength || null, personnelSignature(item.personnel),
+      item.equipment?.kind ?? null,
+      Boolean(item.estimated), Boolean(item.rosterOnly),
       [...counts].sort(([a], [b]) => a - b),
     ]);
     if (!interned.has(key)) interned.set(key, interned.size + 1);
@@ -1173,13 +673,13 @@ function unitElement(unit, composition, children) {
   node.className = unit.parent ? "unit" : "unit root";
   node.classList.toggle("reference-root", unit.connector === "reference-root");
   node.classList.toggle("label-right", unit.plateLabel !== undefined);
-  node.classList.toggle("has-strength", Boolean(unit.strength || unit.estimated));
+
   node.classList.toggle("has-composition", Boolean(composition));
   node.dataset.id = unit.id;
   node.style.left = `${unit.x}px`;
   node.style.top = `${unit.y}px`;
   const locked = chart.expansionLocks?.includes(unit.id);
-  node.title = locked ? `${unit.name} · 展开已锁定` : unit.name;
+
   const rank = unit.rank === "none" ? "" : `，${ranks[unit.rank].name}级`;
   const details = composition ? [composition.children, composition.strength].filter(Boolean) : [];
   if (!composition && unit.estimated) details.push(`推定 ${strengthText(strengthOf(unit, children).people)}`);
@@ -1189,18 +689,13 @@ function unitElement(unit, composition, children) {
   node.setAttribute("aria-pressed", String(unit.id === selectedId));
   node.innerHTML = `<span class="unit-rank">${rankMark(unit.rank)}</span>${symbol(unit.type, count > 1)}<span class="unit-label"></span>`;
   const label = plateCaption(unit, count > 1);
-  node.lastElementChild.textContent = label;
-  node.lastElementChild.hidden = !label && !details.length;
-  for (const detail of details) {
-    const size = document.createElement("small");
-    size.className = "plate-strength";
-    size.textContent = detail;
-    node.lastElementChild.append(size);
-  }
+  node.lastElementChild.textContent = unit.equipment && label
+    ? `${label} · 1${equipmentKinds[unit.equipment.kind].unit}` : label;
+  node.lastElementChild.hidden = !label;
   if (isReferenceBranch(unit) && children.has(unit.id)) {
     const closed = chart.folded?.includes(unit.id);
     node.setAttribute("aria-expanded", String(!closed));
-    if (!locked) node.title = `${unit.name} · 点击${closed ? "展开" : "收起"}编制`;
+
     const indicator = document.createElement("span");
     indicator.className = "unit-disclosure";
     indicator.innerHTML = icon("chevron");
@@ -1286,116 +781,134 @@ function svgElement(name, attributes, text) {
 
 function saveChartImage() {
   if (!visibleUnits.length) return;
-  const origin = $("world").getBoundingClientRect();
-  const background = getComputedStyle(stage).getPropertyValue("--board").trim();
-  const chartTitle = getComputedStyle($("chart-title"));
-  const artwork = svgElement("g", { "font-family": getComputedStyle(unitsLayer).fontFamily });
-  const bounds = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+  const previousTransform = $("world").style.transform;
+  $("world").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+  try {
+    const origin = $("world").getBoundingClientRect();
+    const background = getComputedStyle(stage).getPropertyValue("--board").trim();
+    const chartTitle = getComputedStyle($("chart-title"));
+    const artwork = svgElement("g", { "font-family": getComputedStyle(unitsLayer).fontFamily });
+    const bounds = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
 
-  function include(x, y, width, height) {
-    bounds.left = Math.min(bounds.left, x);
-    bounds.top = Math.min(bounds.top, y);
-    bounds.right = Math.max(bounds.right, x + width);
-    bounds.bottom = Math.max(bounds.bottom, y + height);
-  }
+    function include(x, y, width, height) {
+      bounds.left = Math.min(bounds.left, x);
+      bounds.top = Math.min(bounds.top, y);
+      bounds.right = Math.max(bounds.right, x + width);
+      bounds.bottom = Math.max(bounds.bottom, y + height);
+    }
 
-  function position(element) {
-    const rect = element.getBoundingClientRect();
-    const x = (rect.left - origin.left) / view.scale;
-    const y = (rect.top - origin.top) / view.scale;
-    const width = rect.width / view.scale;
-    const height = rect.height / view.scale;
-    include(x, y, width, height);
-    return { x, y, width, height };
-  }
+    function position(element) {
+      const rect = element.getBoundingClientRect();
+      const x = (rect.left - origin.left) / view.scale;
+      const y = (rect.top - origin.top) / view.scale;
+      const width = rect.width / view.scale;
+      const height = rect.height / view.scale;
+      include(x, y, width, height);
+      return { x, y, width, height };
+    }
 
-  function drawText(parent, element, content, box) {
-    if (!content.trim()) return;
-    const { x, y, width, height } = box;
-    const style = getComputedStyle(element);
-    const leftAligned = style.textAlign === "left" || style.textAlign === "start";
-    parent.append(svgElement("text", {
-      x: leftAligned ? x + (parseFloat(style.paddingLeft) || 0) : x + width / 2,
-      y: y + height / 2,
-      "text-anchor": leftAligned ? "start" : "middle",
-      "dominant-baseline": "central",
-      "font-size": style.fontSize,
-      "font-weight": style.fontWeight,
-      fill: style.color,
-    }, content));
-  }
+    const textMeasure = document.createElement("canvas").getContext("2d");
 
-  for (const line of $("connections").children) {
-    const { x, y, width, height } = line.getBBox();
-    const style = getComputedStyle(line);
-    include(x, y, width, height);
-    artwork.append(svgElement("path", {
-      d: line.getAttribute("d"), fill: "none", stroke: style.stroke, "stroke-width": style.strokeWidth,
-      "stroke-linejoin": style.strokeLinejoin,
-    }));
-  }
-  for (const card of unitsLayer.children) {
-    const group = svgElement("g", { "data-unit-id": card.dataset.id });
-    for (const glyph of card.querySelectorAll(".rank-mark, .unit-symbol")) {
-      const shape = glyph.cloneNode(true);
-      for (const [name, value] of Object.entries(position(glyph))) shape.setAttribute(name, value);
-      shape.setAttribute("color", getComputedStyle(glyph).color);
-      shape.setAttribute("overflow", "visible");
-      const originals = glyph.querySelectorAll("g, rect, path, circle, ellipse");
-      const copies = shape.querySelectorAll("g, rect, path, circle, ellipse");
-      originals.forEach((part, index) => {
-        const style = getComputedStyle(part);
-        for (const property of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"]) {
-          copies[index].setAttribute(property, style.getPropertyValue(property));
+    function drawText(parent, element, content, box) {
+      if (!content.trim()) return;
+      const { x, y, width, height } = box;
+      const style = getComputedStyle(element);
+      const leftAligned = style.textAlign === "left" || style.textAlign === "start";
+      if (style.textOverflow === "ellipsis" && textMeasure) {
+        const available = Math.max(0, width - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0));
+        textMeasure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        if (textMeasure.measureText(content).width > available) {
+          const characters = Array.from(content);
+          while (characters.length && textMeasure.measureText(characters.join("") + "…").width > available) characters.pop();
+          content = textMeasure.measureText("…").width <= available ? characters.join("") + "…" : "";
         }
-      });
-      group.append(shape);
+      }
+      parent.append(svgElement("text", {
+        x: leftAligned ? x + (parseFloat(style.paddingLeft) || 0) : x + width / 2,
+        y: y + height / 2,
+        "text-anchor": leftAligned ? "start" : "middle",
+        "dominant-baseline": "central",
+        "font-size": style.fontSize,
+        "font-weight": style.fontWeight,
+        fill: style.color,
+      }, content));
     }
-    const label = card.querySelector(".unit-label");
-    if (!label.hidden) {
-      const box = position(label);
-      const name = label.firstChild?.nodeType === Node.TEXT_NODE ? label.firstChild.textContent : "";
-      group.append(svgElement("rect", { ...box, fill: background }));
-      const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
-      drawText(group, label, name, { ...box, height: lineHeight });
-      for (const detail of label.children) drawText(group, detail, detail.textContent, position(detail));
+
+    for (const line of $("connections").children) {
+      const { x, y, width, height } = line.getBBox();
+      const style = getComputedStyle(line);
+      include(x, y, width, height);
+      artwork.append(svgElement("path", {
+        d: line.getAttribute("d"), fill: "none", stroke: style.stroke, "stroke-width": style.strokeWidth,
+        "stroke-linejoin": style.strokeLinejoin,
+      }));
     }
-    const quantity = card.querySelector(".stack-count");
-    if (quantity) {
-      const box = position(quantity);
-      group.append(svgElement("rect", { ...box, fill: background }));
-      drawText(group, quantity, quantity.textContent, box);
+    for (const card of unitsLayer.children) {
+      const group = svgElement("g", { "data-unit-id": card.dataset.id });
+      for (const glyph of card.querySelectorAll(".rank-mark, .unit-symbol")) {
+        const shape = glyph.cloneNode(true);
+        for (const [name, value] of Object.entries(position(glyph))) shape.setAttribute(name, value);
+        shape.setAttribute("color", getComputedStyle(glyph).color);
+        shape.setAttribute("overflow", "visible");
+        const originals = glyph.querySelectorAll("g, rect, path, circle, ellipse");
+        const copies = shape.querySelectorAll("g, rect, path, circle, ellipse");
+        originals.forEach((part, index) => {
+          const style = getComputedStyle(part);
+          for (const property of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"]) {
+            copies[index].setAttribute(property, style.getPropertyValue(property));
+          }
+        });
+        group.append(shape);
+      }
+      const label = card.querySelector(".unit-label");
+      if (!label.hidden) {
+        const box = position(label);
+        const name = label.firstChild?.nodeType === Node.TEXT_NODE ? label.firstChild.textContent : "";
+        const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
+        drawText(group, label, name, { ...box, height: lineHeight });
+        for (const detail of label.children) drawText(group, detail, detail.textContent, position(detail));
+      }
+      const quantity = card.querySelector(".stack-count");
+      if (quantity) {
+        const box = position(quantity);
+        drawText(group, quantity, quantity.textContent, box);
+      }
+      artwork.append(group);
     }
-    artwork.append(group);
+
+    Object.assign(bounds, projectBounds(bounds, displayMode));
+    const padding = 32;
+    const header = 88;
+    const width = Math.ceil(Math.max(bounds.right - bounds.left, chart.title.length * 28, 320) + padding * 2);
+    const height = Math.ceil(bounds.bottom - bounds.top + header + padding * 2);
+    const image = svgElement("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img" });
+    image.append(
+      svgElement("title", {}, chart.title),
+      svgElement("rect", { width, height, fill: background }),
+      svgElement("text", { x: padding, y: 51, fill: chartTitle.color, "font-size": 28, "font-weight": 600, "font-family": chartTitle.fontFamily }, chart.title),
+      svgElement("text", { x: padding, y: 76, fill: chartTitle.color, "font-size": 13, "font-family": getComputedStyle(unitsLayer).fontFamily }, $("chart-description").textContent),
+    );
+    artwork.setAttribute("transform", `translate(${padding - bounds.left} ${header + padding - bounds.top}) matrix(${projectionMatrix(displayMode).join(" ")} 0 0)`);
+    image.append(artwork);
+
+    const file = new Blob([new XMLSerializer().serializeToString(image)], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${chart.title.replace(/[\\/:*?"<>|]/g, "_")}.svg`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    announce("已导出当前编制图");
+  } finally {
+    $("world").style.transform = previousTransform;
   }
-
-  const padding = 32;
-  const header = 88;
-  const width = Math.ceil(Math.max(bounds.right - bounds.left, chart.title.length * 28, 320) + padding * 2);
-  const height = Math.ceil(bounds.bottom - bounds.top + header + padding * 2);
-  const image = svgElement("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img" });
-  image.append(
-    svgElement("title", {}, chart.title),
-    svgElement("rect", { width, height, fill: background }),
-    svgElement("text", { x: padding, y: 51, fill: chartTitle.color, "font-size": 28, "font-weight": 600, "font-family": chartTitle.fontFamily }, chart.title),
-    svgElement("text", { x: padding, y: 76, fill: chartTitle.color, "font-size": 13, "font-family": getComputedStyle(unitsLayer).fontFamily }, $("chart-description").textContent),
-  );
-  artwork.setAttribute("transform", `translate(${padding - bounds.left} ${header + padding - bounds.top})`);
-  image.append(artwork);
-
-  const file = new Blob([new XMLSerializer().serializeToString(image)], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(file);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${chart.title.replace(/[\\/:*?"<>|]/g, "_")}.svg`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  announce("已导出当前编制图");
 }
 
 function render() {
+  hideUnitTooltip();
+  closeUnitMenu();
   displayedStacks = validStacks();
   const { units, children } = visibleProjection();
   visibleUnits = units;
@@ -1406,7 +919,7 @@ function render() {
   $("new-chart").hidden = Boolean(presetEdit);
   $("chart-library").hidden = Boolean(presetEdit);
   $("manage-presets").hidden = Boolean(presetEdit);
-  $("chart-description").textContent = presetEdit ? "预设编制图" : chart.showComposition ? "编制示例"
+  $("chart-description").textContent = presetEdit ? "预设编制图" : chart.equipmentFormation ? "装备编成与定员示例 · 逐层展开查看装备和乘员" : chart.showComposition ? "编制示例"
     : chart.referenceNewFourthArmy ? "1938年春初建序列 · 点击支队兵牌展开 · 补充编成与员额为示例"
     : chart.referenceArmy ? "1937年改编初期 · 点击师级兵牌展开 · 补充编成与员额为示例"
     : chart.referenceComplete && ["120", "129"].includes(chart.referenceDivision) ? "1937年8月改编序列 · 下级编成与员额为示例"
@@ -1455,6 +968,7 @@ function renderInspector() {
   $("unit-name").value = unit.name;
   $("unit-type").value = unit.type;
   $("unit-rank").value = unit.rank;
+  $("unit-rank").disabled = Boolean(unit.equipment);
   const blocked = descendants(unit.id);
   const parents = chart.units.filter((candidate) => !blocked.has(candidate.id));
   $("unit-parent").replaceChildren(option("", "无上级（独立单位）"), ...parents.map((candidate) => option(candidate.id, candidate.name)));
@@ -1466,8 +980,10 @@ function renderInspector() {
   const children = byParent.get(unit.id)?.length ?? 0;
   const deferred = hasDeferredChildren(unit);
   const hasRoster = Boolean(unit.personnel?.length);
-  const headquarters = unit.type === "headquarters";
-  const showOwnSummary = headquarters && hasRoster;
+  const showOwnSummary = supportsPersonnel(unit) && hasRoster;
+  const equipment = Boolean(unit.equipment);
+  $("unit-equipment-summary").hidden = !Object.keys(stat.equipment).length;
+  $("unit-equipment-summary").textContent = equipmentSummary(stat.equipment);
   const totalText = stat.known && !stat.incomplete
     ? `编制人数 ${unit.estimated ? `推定 ${strengthText(stat.people)}` : strengthSummary(stat)}` : strengthSummary(stat);
   $("unit-strength-summary").hidden = (!stat.known && !unit.strength && !children && !deferred)
@@ -1480,12 +996,13 @@ function renderInspector() {
   const ownPeople = personnelTotal(unit.personnel);
   const ownOfficers = officerTotal(unit.personnel);
   $("unit-staff-summary").textContent = unit.rosterOnly ? `已录 ${ownPeople} 项主要岗位`
-    : `本部 ${unit.estimated ? "推定 " : ""}${strengthText(ownPeople)} · 军官 ${strengthText(ownOfficers)}`;
+    : `${equipment ? "乘员" : "本部"} ${unit.estimated ? "推定 " : ""}${strengthText(ownPeople)} · 军官 ${strengthText(ownOfficers)}`;
   $("unit-subordinate-summary").hidden = !showOwnSummary || (!children && !deferred) || !stat.known;
   const subordinateStrength = strengthText(stat.people - (unit.rosterOnly ? 0 : ownPeople));
   const subordinateOfficers = strengthText(stat.officers - (unit.rosterOnly ? 0 : ownOfficers));
   $("unit-subordinate-summary").textContent = `${stat.incomplete ? "下辖已录入" : "下辖"} ${subordinateStrength}${stat.estimated ? "（含推定）" : ""} · 军官 ${subordinateOfficers}`;
-  $("edit-unit-staff").hidden = !headquarters;
+  $("edit-unit-staff").hidden = !supportsPersonnel(unit);
+  $("edit-unit-staff").textContent = equipment ? "编辑乘员" : "编辑本部人员";
   const locks = expansionLocks();
   const locked = locks.roots.has(unit.id);
   const inherited = locks.frozen.has(unit.id) && !locked;
@@ -1515,6 +1032,111 @@ function selectUnit(id, openInspector = false) {
 function activateUnit(unit) {
   selectUnit(unit.id, true);
   if (isReferenceBranch(unit) && chart.units.some((child) => child.parent === unit.id)) toggleBranch(unit.id);
+}
+
+// Keep hover information outside the zoomed canvas and out of SVG export.
+function hideUnitTooltip() {
+  const tooltip = $("unit-tooltip");
+  tooltip.hidden = true;
+  unitsLayer.querySelectorAll('[aria-describedby="unit-tooltip"]').forEach(node => node.removeAttribute("aria-describedby"));
+}
+
+function showUnitTooltip(node, x, y) {
+  if (gesture || !$("unit-context-menu").hidden) return;
+  const unit = getUnit(node.dataset.id);
+  if (!unit) return;
+  const tooltip = $("unit-tooltip");
+  const children = indexChildren();
+  const stat = strengthOf(unit, children);
+  const composition = compositionOf(unit, children);
+  const own = !unit.rosterOnly && fixedStrength(unit.strength) ? unit.strength[0] : 0;
+  tooltip.replaceChildren();
+  const heading = document.createElement("div");
+  heading.className = "hud-titlebar";
+  heading.textContent = unit.name;
+  tooltip.append(heading);
+  const body = document.createElement("div");
+  body.className = "tooltip-body";
+  const rows = [["单位", [ranks[unit.rank].name, types[unit.type].name].filter(Boolean).join(" · ")]];
+  const stacked = displayedStacks.get(unit.id)?.length ?? 0;
+  if (stacked > 1) rows.push(["叠牌", `${stacked} 枚 · 下方为单枚兵牌数据`]);
+  if (Object.keys(stat.equipment).length) rows.push(["装备", equipmentSummary(stat.equipment)]);
+  if (composition.children) rows.push(["组成", composition.children]);
+  if (unit.type === "headquarters") {
+    if (own) rows.push(["本部人员", `${unit.estimated ? "推定 " : ""}${strengthText(own)}`]);
+    if (unit.rosterOnly) rows.push(["本部岗位", `已录 ${personnelTotal(unit.personnel)} 项，不计入员额`]);
+    if (composition.children && stat.known) rows.push(["下辖人员", strengthText(stat.people - own)]);
+  }
+  if (unit.equipment) {
+    rows.push(["乘员", strengthText(own)], ["定员说明", "示例定员，可按型号修改"]);
+  }
+  rows.push(["合计人数", composition.strength]);
+  if (stat.officers) rows.push(["军官", strengthText(stat.officers)]);
+  if (unit.personnel?.length) rows.push(["主要岗位", unit.personnel.map(entry => `${entry.role} ${entry.count}人`).join("、")]);
+  if (chart.expansionLocks?.includes(unit.id)) rows.push(["展开状态", "已锁定"]);
+  for (const [name, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "tooltip-row";
+    const key = document.createElement("span");
+    key.textContent = name;
+    const detail = document.createElement("span");
+    detail.textContent = value;
+    row.append(key, detail);
+    body.append(row);
+  }
+  tooltip.append(body);
+  tooltip.hidden = false;
+  node.setAttribute("aria-describedby", "unit-tooltip");
+  const bounds = tooltip.getBoundingClientRect();
+  tooltip.style.left = `${Math.max(8, Math.min(x + 16, innerWidth - bounds.width - 8))}px`;
+  tooltip.style.top = `${Math.max(8, y + bounds.height + 24 > innerHeight ? y - bounds.height - 12 : y + 16)}px`;
+}
+
+function closeUnitMenu(restoreFocus = false) {
+  const menu = $("unit-context-menu");
+  const id = menu.dataset.unit;
+  menu.hidden = true;
+  if (restoreFocus && id) unitsLayer.querySelector(`[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
+}
+
+function openUnitMenu(unit, x, y) {
+  hideUnitTooltip();
+  selectUnit(unit.id);
+  const menu = $("unit-context-menu");
+  menu.replaceChildren();
+  menu.dataset.unit = unit.id;
+  menu.setAttribute("aria-label", `${unit.name}快捷操作`);
+  for (const id of ["fold-branch", "fold-peers", "lock-expansion", "edit-unit-staff"]) {
+    const control = $(id);
+    if (control.hidden) continue;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "hud-menu__item";
+    item.setAttribute("role", "menuitem");
+    item.textContent = control.textContent;
+    item.disabled = control.disabled;
+    item.addEventListener("click", () => {
+      closeUnitMenu();
+      control.click();
+    });
+    menu.append(item);
+  }
+  const properties = document.createElement("button");
+  properties.type = "button";
+  properties.className = "hud-menu__item";
+  properties.setAttribute("role", "menuitem");
+  properties.textContent = "单位属性";
+  properties.addEventListener("click", () => {
+    closeUnitMenu();
+    switchTab("unit");
+    $("unit-name").focus();
+  });
+  menu.append(properties);
+  menu.hidden = false;
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(x, innerWidth - bounds.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, innerHeight - bounds.height - 8))}px`;
+  menu.querySelector("button:not(:disabled)")?.focus({ preventScroll: true });
 }
 
 function switchTab(tab, focus = false) {
@@ -1567,13 +1189,25 @@ function armPreset(type) {
 }
 
 function applyView() {
-  $("world").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+  $("world").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale}) matrix(${projectionMatrix(displayMode).join(",")},0,0)`;
   $("world").style.setProperty("--label-size", `${Math.min(34, Math.max(14, 11 / view.scale))}px`);
   $("world").style.setProperty("--label-height", `${Math.min(32, Math.max(20, 13 / view.scale))}px`);
   const gridStep = 20 * view.scale * Math.max(1, Math.ceil(.6 / view.scale));
   stage.style.setProperty("--grid-step", `${gridStep}px`);
   stage.style.setProperty("--grid-x", `${view.x % gridStep - gridStep / 2}px`);
   stage.style.setProperty("--grid-y", `${view.y % gridStep - gridStep / 2}px`);
+  if (displayMode === "depth") {
+    const step = gridStep / view.scale;
+    const matrix = projectionMatrix(displayMode).map(value => value * view.scale);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><defs><pattern id="grid" width="${step}" height="${step}" patternUnits="userSpaceOnUse" patternTransform="matrix(${matrix.join(" ")} ${view.x} ${view.y})"><circle cx="0" cy="0" r="${.9/view.scale}" fill="#bccac4"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/></svg>`;
+    stage.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    stage.style.backgroundSize = "100% 100%";
+    stage.style.backgroundPosition = "0 0";
+  } else {
+    stage.style.removeProperty("background-image");
+    stage.style.removeProperty("background-size");
+    stage.style.removeProperty("background-position");
+  }
   $("zoom-level").textContent = `${Math.round(view.scale * 100)}%`;
   $("zoom-in").disabled = view.scale >= maxScale;
   $("zoom-out").disabled = view.scale <= minScale;
@@ -1588,12 +1222,13 @@ function fitView() {
   } else {
     const xs = visibleUnits.map((unit) => unit.x);
     const ys = visibleUnits.map((unit) => unit.y);
-    const left = Math.min(...xs) - 72;
-    const right = Math.max(...visibleUnits.map((unit) => unit.x + (chart.showComposition ? 208 : unit.plateLabel !== undefined ? 132 : 72)));
-    const top = Math.min(...ys) - 44;
-    const bottom = Math.max(...visibleUnits.map((unit) => unit.y + (chart.showComposition ? 32 : unit.strength || unit.estimated ? 68 : 48)));
+    const modelLeft = Math.min(...xs) - 72;
+    const modelRight = Math.max(...visibleUnits.map((unit) => unit.x + (chart.showComposition ? 208 : unit.plateLabel !== undefined ? 132 : 72)));
+    const modelTop = Math.min(...ys) - 44;
+    const modelBottom = Math.max(...visibleUnits.map((unit) => unit.y + (chart.showComposition ? 32 : unit.strength || unit.estimated ? 68 : 48)));
+    const {left,right,top,bottom} = projectBounds({left:modelLeft,right:modelRight,top:modelTop,bottom:modelBottom}, displayMode);
     const heightFit = (height - 68) / (bottom - top);
-    view.scale = Math.max(minScale, Math.min(1, (width - 32) / (right - left), chart.showComposition ? Math.max(.84, heightFit) : heightFit));
+    view.scale = Math.max(minScale, Math.min(1, (width - 32) / (right - left), chart.showComposition && displayMode === "flat" ? Math.max(.84, heightFit) : heightFit));
     view.x = width / 2 - (left + right) * view.scale / 2;
     view.y = chart.showComposition && heightFit < view.scale ? 16 - top * view.scale
       : height / 2 - 14 - (top + bottom) * view.scale / 2;
@@ -1613,7 +1248,7 @@ function zoomAt(scale, x = stage.clientWidth / 2, y = stage.clientHeight / 2) {
 
 function canvasPoint(clientX, clientY) {
   const rect = stage.getBoundingClientRect();
-  return { x: (clientX - rect.left - view.x) / view.scale, y: (clientY - rect.top - view.y) / view.scale };
+  return unprojectPoint({ x: (clientX - rect.left - view.x) / view.scale, y: (clientY - rect.top - view.y) / view.scale }, displayMode);
 }
 
 function snap(value) {
@@ -1634,8 +1269,9 @@ function attachPosition(parent, movingIds, child, units = chart.units) {
 }
 
 function reveal(unit) {
-  const x = unit.x * view.scale + view.x;
-  const y = unit.y * view.scale + view.y;
+  const projected = projectPoint(unit, displayMode);
+  const x = projected.x * view.scale + view.x;
+  const y = projected.y * view.scale + view.y;
   const marginX = Math.min(76, stage.clientWidth / 3);
   const minY = 48;
   const maxY = stage.clientHeight - 64;
@@ -1651,6 +1287,7 @@ function makePresetUnit(definition, x, y, parent, recipe) {
   if (definition.rosterOnly) unit.rosterOnly = true;
   if (definition.strength) unit.strength = [...definition.strength];
   if (definition.personnel) unit.personnel = structuredClone(definition.personnel);
+  if (definition.equipment) unit.equipment = structuredClone(definition.equipment);
   if (definition.parts?.length) unit.recipe = recipe;
   return unit;
 }
@@ -1695,6 +1332,7 @@ function materializeChildren(parent) {
 }
 
 function addUnit(key, parent, point) {
+  if (parent?.equipment) return editorFeedback("单件装备的人员请通过“编辑乘员”配置");
   const definition = paletteItem(key);
   const fromCatalog = Object.hasOwn(presets, key);
   const catalog = fromCatalog ? presets : builtInPresets;
@@ -1728,6 +1366,14 @@ function updateUnit(fields, movingIds) {
   const hasChildren = hasDeferredChildren(unit) || chart.units.some((child) => child.parent === unit.id);
   const nextType = fields.type ?? unit.type;
   const nextRank = fields.rank ?? unit.rank;
+  if (unit.equipment && (!equipmentKinds[nextType] || nextRank !== "team")) {
+    renderInspector();
+    return editorFeedback("单件装备使用机组级别，请选择装备兵种");
+  }
+  if (moving && getUnit(fields.parent)?.equipment) {
+    renderInspector();
+    return editorFeedback("单件装备的人员请通过“编辑乘员”配置");
+  }
   if ("strength" in fields && ((!fields.strength && !hasChildren) || (fields.strength && !fixedStrength(fields.strength)))) {
     return editorFeedback("基层单位需要固定的正整数人数");
   }
@@ -1746,6 +1392,10 @@ function updateUnit(fields, movingIds) {
       else if (!fixedStrength(unit.strength)) unit.strength = [...preset.strength];
     }
     if (unit.type === "headquarters" && nextType !== "headquarters") delete unit.personnel;
+    if (unit.equipment && nextType !== unit.type) {
+      const definition = equipmentPreset(nextType);
+      Object.assign(unit, { equipment: definition.equipment, personnel: definition.personnel, strength: definition.strength });
+    }
     if (movingIds) {
       if (chart.showComposition || chart.verticalLayout || chart.reference) chart.manualLayout = true;
       const dx = fields.x - unit.x;
@@ -1999,7 +1649,7 @@ function paletteItem(key) {
   return {
     ...builtInPresets[defaultPresetKey(type.rank, key)],
     type: key, rank: type.rank,
-    name: type.rank === "none" ? type.name : type.name + ranks[type.rank].name,
+    name: type.rank === "none" || (type.rank === "team" && equipmentKinds[key]) ? type.name : type.name + ranks[type.rank].name,
   };
 }
 
@@ -2026,7 +1676,7 @@ function renderPalette() {
       const preset = paletteItem(key);
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "preset";
+      button.className = "preset hud-row";
       button.dataset.type = key;
       button.setAttribute("aria-pressed", String(placement === key));
       button.setAttribute("aria-label", isFormation ? preset.name : types[key].name);
@@ -2038,7 +1688,7 @@ function renderPalette() {
         const parts = preset.parts ?? [];
         detail.textContent = parts.length
           ? parts.map(([child, count]) => `${count} × ${presets[child].name}`).join(" · ")
-          : strengthSummary(stat);
+          : preset.equipment ? `1 ${equipmentKinds[preset.equipment.kind].unit} · 乘员 ${strengthText(stat.people)}` : strengthSummary(stat);
         detail.hidden = !detail.textContent;
         button.title = [preset.role, strengthSummary(stat)].filter(Boolean).join(" · ");
       }
@@ -2108,6 +1758,67 @@ unitsLayer.addEventListener("click", (event) => {
   const unit = getUnit(node.dataset.id);
   if (placement) addUnit(placement, unit);
   else activateUnit(unit);
+});
+
+unitsLayer.addEventListener("pointerover", (event) => {
+  const node = event.target.closest(".unit");
+  if (!node || node.contains(event.relatedTarget) || event.pointerType === "touch") return;
+  hideUnitTooltip();
+  showUnitTooltip(node, event.clientX, event.clientY);
+});
+unitsLayer.addEventListener("pointerout", (event) => {
+  const node = event.target.closest(".unit");
+  if (node && !node.contains(event.relatedTarget)) hideUnitTooltip();
+});
+unitsLayer.addEventListener("focusin", (event) => {
+  if (!event.target.matches(".unit:focus-visible")) return;
+  const bounds = event.target.getBoundingClientRect();
+  showUnitTooltip(event.target, bounds.right, bounds.top);
+});
+unitsLayer.addEventListener("focusout", hideUnitTooltip);
+document.addEventListener("pointerdown", hideUnitTooltip);
+window.addEventListener("resize", hideUnitTooltip);
+window.addEventListener("scroll", hideUnitTooltip, true);
+stage.addEventListener("wheel", hideUnitTooltip, { passive: true });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") hideUnitTooltip();
+});
+
+unitsLayer.addEventListener("contextmenu", (event) => {
+  const node = event.target.closest(".unit");
+  if (!node) return;
+  event.preventDefault();
+  const unit = getUnit(node.dataset.id);
+  const bounds = node.getBoundingClientRect();
+  openUnitMenu(unit, event.clientX || bounds.right, event.clientY || bounds.top);
+});
+unitsLayer.addEventListener("keydown", (event) => {
+  if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+  const node = event.target.closest(".unit");
+  if (!node) return;
+  event.preventDefault();
+  const bounds = node.getBoundingClientRect();
+  openUnitMenu(getUnit(node.dataset.id), bounds.right, bounds.top);
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!$("unit-context-menu").contains(event.target)) closeUnitMenu();
+});
+window.addEventListener("resize", () => closeUnitMenu());
+stage.addEventListener("wheel", () => closeUnitMenu(), { passive: true });
+$("unit-context-menu").addEventListener("keydown", (event) => {
+  if (event.key === "Escape" || event.key === "Tab") {
+    closeUnitMenu(event.key === "Escape");
+    event.stopPropagation();
+    if (event.key === "Escape") event.preventDefault();
+    return;
+  }
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const items = [...event.currentTarget.querySelectorAll("button:not(:disabled)")];
+  const current = items.indexOf(document.activeElement);
+  const index = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1
+    : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+  items[index]?.focus();
 });
 
 unitsLayer.addEventListener("focusin", (event) => {
@@ -2217,7 +1928,7 @@ function renderLibrary() {
     wrapper.className = "chart-list-row";
     const row = document.createElement("button");
     row.type = "button";
-    row.className = "chart-entry";
+    row.className = "chart-entry hud-row";
     row.dataset.id = item.id;
     const current = item.id === chart.id;
     if (current) row.setAttribute("aria-current", "true");
@@ -2292,7 +2003,7 @@ let deleteAction = null;
 function trashButton(label) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-button";
+  button.className = "icon-button hud-icon-btn";
   button.setAttribute("aria-label", label);
   button.title = label;
   button.innerHTML = icon("trash");
@@ -2342,12 +2053,19 @@ function deleteChart(id) {
 function wholePresetRecords() {
   const stored = readStorage(wholePresetStorageKey);
   if (!Array.isArray(stored)) return [];
-  return stored.filter((record) => typeof record?.id === "string" && isChart(record.chart)).map((record) => {
+  let equipmentUpdated = false;
+  const records = stored.filter((record) => typeof record?.id === "string" && isChart(record.chart)).map((record) => {
     if (record.id === "builtin-whole-company") migrateInfantryHeadquarters(record.chart);
     if (record.id === "builtin-whole-battalion" || record.chart.referenceComplete) migrateCommandGuards(record.chart);
     if (record.chart.reference) migrateReferenceLayout(record.chart);
+    equipmentUpdated = migrateSupportEquipment(record.chart) || equipmentUpdated;
+    equipmentUpdated = migrateNewFourthDirectUnits(record.chart) || equipmentUpdated;
     return record;
   });
+  if (equipmentUpdated) {
+    try { writeWholePresets(records); } catch { /* Keep upgraded presets usable in memory if storage is full. */ }
+  }
+  return records;
 }
 
 function writeWholePresets(records) {
@@ -2367,6 +2085,8 @@ function builtInWholePresets() {
   return [
     { id: "builtin-whole-company", builtIn: true, title: "步兵连编制", chart: infantryCompanyExample() },
     { id: "builtin-whole-battalion", builtIn: true, title: "步兵营编制", chart: infantryBattalionExample() },
+    { id: "builtin-whole-artillery-battalion", builtIn: true, title: "炮兵营编制", chart: supportBattalionExample("artillery") },
+    { id: "builtin-whole-logistics-battalion", builtIn: true, title: "辎重营编制", chart: supportBattalionExample("logistics") },
     ...["115", "120", "129"].map((division) => {
       const example = completeDivisionExample(division);
       return { id: `builtin-whole-${division}`, builtIn: true, title: example.title, chart: example };
@@ -2393,7 +2113,7 @@ function renderPresetManager() {
     copy.append(title, detail);
     const use = document.createElement("button");
     use.type = "button";
-    use.className = "button secondary";
+    use.className = "button secondary hud-btn";
     use.textContent = "使用";
     use.setAttribute("aria-label", `使用预设：${record.title}`);
     use.addEventListener("click", () => {
@@ -2407,7 +2127,7 @@ function renderPresetManager() {
     });
     const edit = document.createElement("button");
     edit.type = "button";
-    edit.className = "button secondary";
+    edit.className = "button secondary hud-btn";
     edit.textContent = "编辑";
     edit.setAttribute("aria-label", `编辑预设：${record.title}`);
     edit.addEventListener("click", () => editWholePreset(record));
@@ -2433,6 +2153,9 @@ function requireStaffedChart() {
   if (!chart.units.length) throw new Error("请先在画布上搭建编制");
   const children = indexChildren();
   for (const unit of chart.units) {
+    if (!validEquipment(unit) || (unit.equipment && (children.has(unit.id) || hasDeferredChildren(unit)))) {
+      throw new Error("单件装备须配置固定乘员岗位，不能包含下级单位");
+    }
     if (unit.strength && !fixedStrength(unit.strength)) throw new Error("请先补齐编制里的固定人数");
     const recipe = recipeOf(unit);
     if (recipe) {
@@ -2512,7 +2235,7 @@ function exportBasePreset(edit, children) {
         return [childKey, 1];
       });
     const name = key === edit.id && chart.title !== edit.title ? chart.title : unit.name;
-    overrides[key] = { name, type: unit.type, rank: unit.rank, role: unit.role, strength: unit.strength, personnel: unit.personnel, estimated: unit.estimated, parts };
+    overrides[key] = { name, type: unit.type, rank: unit.rank, role: unit.role, strength: unit.strength, personnel: unit.personnel, equipment: unit.equipment, estimated: unit.estimated, parts };
     if (key !== edit.id) overrides[key].internalFor = edit.id;
   }
   exportUnit(roots[0], edit.id);
@@ -2597,7 +2320,7 @@ function readStaffRows() {
 
 function renderStaffTotal() {
   const personnel = readStaffRows();
-  $("staff-total").textContent = `本部 ${strengthText(personnelTotal(personnel))} · 军官 ${strengthText(officerTotal(personnel))}`;
+  $("staff-total").textContent = `${getUnit(selectedId)?.equipment ? "乘员" : "本部"} ${strengthText(personnelTotal(personnel))} · 军官 ${strengthText(officerTotal(personnel))}`;
 }
 
 function addStaffRow(entry = { role: "", count: 1, officer: false }) {
@@ -2632,14 +2355,16 @@ function addStaffRow(entry = { role: "", count: 1, officer: false }) {
 
 $("edit-unit-staff").addEventListener("click", () => {
   const unit = getUnit(selectedId);
-  if (unit?.type !== "headquarters") return;
-  $("staff-dialog-title").textContent = `${unit.name} · 本部人员`;
+  if (!supportsPersonnel(unit)) return;
+  $("staff-dialog-title").textContent = `${unit.name} · ${unit.equipment ? "乘员配置" : "本部人员"}`;
+  $("staff-description").textContent = unit.equipment ? "配置这一辆车或这一门炮的操作人员，按岗位合计人数；默认岗位为可修改示例" : "本部岗位独立计员，下辖单位的人数另计";
+  $("save-staff").textContent = unit.equipment ? "保存乘员" : "保存本部人员";
   $("staff-error").hidden = true;
   $("staff-rows").replaceChildren();
   if (unit.personnel?.length) {
     for (const entry of unit.personnel) addStaffRow(entry);
   } else if (fixedStrength(unit.strength)) {
-    addStaffRow({ role: "本部人员", count: unit.strength[0], officer: false });
+    addStaffRow({ role: unit.equipment ? "操作乘员" : "本部人员", count: unit.strength[0], officer: false });
   } else {
     addStaffRow();
   }
@@ -2658,7 +2383,7 @@ $("staff-form").addEventListener("submit", (event) => {
     return;
   }
   const unit = getUnit(selectedId);
-  if (unit?.type !== "headquarters") return;
+  if (!supportsPersonnel(unit)) return;
   updateUnit({ personnel, strength: [count, count] });
   staffDialog.close();
 });
@@ -2688,7 +2413,7 @@ function addPartRow(key = "", quantity = 1) {
   count.setAttribute("aria-label", "下级数量");
   const remove = document.createElement("button");
   remove.type = "button";
-  remove.className = "icon-button";
+  remove.className = "icon-button hud-icon-btn";
   remove.setAttribute("aria-label", "移除此下级");
   remove.innerHTML = icon("trash");
   remove.addEventListener("click", () => row.remove());
@@ -2705,7 +2430,8 @@ function loadPresetForm() {
   $("preset-rank").value = preset?.rank ?? "team";
   $("preset-role").value = preset?.role ?? "";
   $("preset-headcount").value = fixedStrength(preset?.strength) ? preset.strength[0] : "";
-  $("preset-headcount").readOnly = Boolean(preset?.personnel?.length && preset.type === "headquarters");
+  $("preset-equipment").checked = Boolean(preset?.equipment);
+  syncPresetEquipmentForm();
   $("part-rows").replaceChildren();
   for (const [key, count] of preset?.parts ?? []) addPartRow(key, count);
   setPresetError();
@@ -2722,9 +2448,24 @@ $("edit-templates").addEventListener("click", () => {
 });
 $("preset-picker").addEventListener("change", loadPresetForm);
 $("preset-type").addEventListener("change", () => {
-  const current = presets[$("preset-picker").value];
-  $("preset-headcount").readOnly = $("preset-type").value === "headquarters" && Boolean(current?.personnel?.length);
+  syncPresetEquipmentForm();
 });
+function syncPresetEquipmentForm() {
+  const type = $("preset-type").value;
+  const current = presets[$("preset-picker").value];
+  const equipment = $("preset-equipment");
+  equipment.disabled = !equipmentKinds[type];
+  if (equipment.disabled) equipment.checked = false;
+  const roster = equipment.checked ? (current?.equipment?.kind === type ? current : equipmentPreset(type)).personnel
+    : type === "headquarters" ? current?.personnel : null;
+  $("preset-headcount").readOnly = Boolean(roster?.length);
+  if (roster?.length) $("preset-headcount").value = personnelTotal(roster);
+  $("preset-rank").disabled = equipment.checked;
+  if (equipment.checked) $("preset-rank").value = "team";
+  $("preset-parts").hidden = equipment.checked;
+  $("preset-parts").disabled = equipment.checked;
+}
+$("preset-equipment").addEventListener("change", syncPresetEquipmentForm);
 $("open-template-canvas").addEventListener("click", () => editBasePreset($("preset-picker").value));
 $("add-part").addEventListener("click", () => addPartRow().focus());
 $("cancel-preset").addEventListener("click", () => presetDialog.close());
@@ -2762,10 +2503,13 @@ $("preset-form").addEventListener("submit", (event) => {
     }
     if ([...parts.values()].some((count) => count > 24)) throw new Error("每种下级预设最多 24 份");
     const headcount = $("preset-headcount").valueAsNumber;
-    const personnel = $("preset-type").value === "headquarters" ? presets[key]?.personnel : undefined;
+    const type = $("preset-type").value;
+    const equipment = $("preset-equipment").checked ? { kind: type } : undefined;
+    const personnel = equipment ? (presets[key]?.equipment?.kind === type ? presets[key] : equipmentPreset(type)).personnel
+      : type === "headquarters" ? presets[key]?.personnel : undefined;
     const preset = {
-      name, type: $("preset-type").value, rank: $("preset-rank").value, role: $("preset-role").value.trim(),
-      strength: Number.isNaN(headcount) ? undefined : [headcount, headcount], parts: [...parts], personnel,
+      name, type, rank: $("preset-rank").value, role: $("preset-role").value.trim(),
+      strength: Number.isNaN(headcount) ? undefined : [headcount, headcount], parts: equipment ? [] : [...parts], personnel, equipment,
     };
     if (personnel?.length) {
       const count = personnelTotal(personnel);
@@ -2832,7 +2576,7 @@ document.addEventListener("keydown", (event) => {
       stage.focus();
     }
     if (event.target === stage && placement && key === "enter") {
-      const point = { x: (stage.clientWidth / 2 - view.x) / view.scale, y: (stage.clientHeight / 2 - view.y) / view.scale };
+      const point = unprojectPoint({ x: (stage.clientWidth / 2 - view.x) / view.scale, y: (stage.clientHeight / 2 - view.y) / view.scale }, displayMode);
       addUnit(placement, null, point);
     }
   }
@@ -2859,6 +2603,7 @@ new ResizeObserver(() => {
   applyView();
 }).observe(stage);
 
+initializeViewMode();
 setPlacement(null);
 render();
 save();
