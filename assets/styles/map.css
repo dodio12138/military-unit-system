@@ -85,3 +85,20 @@
 
 .map-position-leader { fill:none; stroke:#82948b; stroke-width:1; stroke-dasharray:2 3; vector-effect:non-scaling-stroke; opacity:.7; pointer-events:none; }
 .map-position-anchor { fill:#60766c; pointer-events:none; }
+
+/* Real raster geography shares the same Mercator camera as the SVG command layer. */
+.map-tiles { position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; }
+#map-svg { position:relative; z-index:1; }
+.map-attribution { position:absolute; z-index:3; bottom:0; left:0; right:0; display:flex; flex-wrap:wrap; gap:4px 8px; padding:3px 8px; background:#fffffff0; font:10px/1.4 system-ui,sans-serif; }
+.map-attribution a { color:#245d65; text-decoration:underline; }
+.map-tile-status { position:absolute; z-index:4; right:12px; top:12px; max-width:240px; padding:6px 8px; border:1px solid var(--line); background:var(--panel); font-size:12px; }
+.map-tile-status[data-state="failed"] { color:#85452e; }
+.map-focus,.map-zoom,.map-mapkey { z-index:2; }
+.map-zoom,.map-mapkey { bottom:36px; }
+.map-command-link { stroke-width:1.8; opacity:.85; }
+@media(max-width:700px) { .map-mapkey { bottom:78px; } .map-attribution { font-size:9px; } }
+
+.map-marker { cursor:grab; }
+.editing-deployment .map-marker { cursor:move; }
+.map-evidence-link { display:block; margin-top:8px; color:var(--accent); overflow-wrap:anywhere; }
+.map-catalog-note { display:block; margin-top:5px; line-height:1.5; }

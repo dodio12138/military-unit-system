@@ -61,9 +61,18 @@ const polandScenario = (() => {
     add(`${d}-truck`, d, '示例运输车组', 'team', side, x + 0.065, y + 0.045, 'truck', 2, 0, false, {kind:'truck',count:1});
     add(`${d}-gun`, d, '示例炮组', 'team', side, x + 0.066, y + 0.046, 'artillery', 6, 0, false, {kind:'gun',count:1});
   }
+  // These are command organizations, not NATO theatre/field-army size levels.
+  for (const unit of units) {
+    if (['de-okh','de-okh-hq','pl-high','pl-high-hq'].includes(unit.id)) {
+      unit.rank = 'none'; unit.commandCategory = 'highCommand';
+    }
+    if (['pl-narew','pl-narew-hq'].includes(unit.id)) {
+      unit.rank = 'none'; unit.commandCategory = 'operationalGroup';
+    }
+  }
   return {
     id: 'poland-1939', title: '1939年9月1日：波兰战役示意', date: '1939-09-01',
-    description: '德波双方集团军级名称为历史背景；每个集团军仅展开一个虚构示例师。全部坐标、下级编制、员额及装备均为推定示意，不构成完整战斗序列或精确部署。边界、河流和海岸线为粗略示意。',
+    description: '德波双方集团军级名称为历史背景；每个集团军仅展开一个虚构示例师。全部坐标、下级编制、员额及装备均为推定示意，不构成完整战斗序列或精确部署。道路与地形底图采用现代地理数据。',
     bounds: {west:12,east:27,south:48,north:56},
     sources: [
       {title:'美国陆军历史研究：1939年德国波兰战役',url:'https://www.ibiblio.org/hyperwar/USA/DAP-Poland/Campaign-II.html'},

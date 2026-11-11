@@ -1,10 +1,21 @@
 "use strict";
 
 const mapStorageKey = "military-unit-system:command-map:v1";
+// Web Mercator, in pixels at zoom 8, with the scenario's north-west origin.
+// Stored unit positions remain geographic lon/lat; only display coordinates change.
 const mapProjection = {
-  xScale: 240 * Math.cos(52 * Math.PI / 180), yScale: 240,
-  project({lon,lat}) { return {x:(lon-12)*this.xScale,y:(56-lat)*this.yScale}; },
-  invert({x,y}) { return {lon:x/this.xScale+12,lat:56-y/this.yScale}; }
+  baseZoom: 8, worldSize: 65536,
+  global({lon,lat}) {
+    const latitude=Math.max(-85.05112878,Math.min(85.05112878,lat))*Math.PI/180;
+    return {x:(lon+180)/360*this.worldSize,y:(1-Math.asinh(Math.tan(latitude))/Math.PI)/2*this.worldSize};
+  },
+  get origin() {return this.global({lon:12,lat:56});},
+  project(point) {const p=this.global(point),o=this.origin;return {x:p.x-o.x,y:p.y-o.y};},
+  invert({x,y}) {
+    const o=this.origin;
+    return {lon:(x+o.x)/this.worldSize*360-180,lat:Math.atan(Math.sinh(Math.PI*(1-2*(y+o.y)/this.worldSize)))*180/Math.PI};
+  },
+  metersPerPixel(latitude,scale) {return 40075016.686*Math.cos(latitude*Math.PI/180)/(this.worldSize*scale);}
 };
 
 class CommandMapModel {
@@ -17,7 +28,7 @@ class CommandMapModel {
       this.children.get(unit.parent).push(unit.id);
     }
     const validIds = values => Array.isArray(values) ? values.filter(id=>this.units.has(id)) : [];
-    this.expanded = new Set(Array.isArray(saved.expanded) ? validIds(saved.expanded) : this.children.get(null));
+    this.expanded = new Set(Array.isArray(saved.expanded) ? validIds(saved.expanded) : scenario.defaultExpanded ?? this.children.get(null));
     this.locks = new Set(validIds(saved.locks));
     this.positions = {};
     for (const [id,position] of Object.entries(saved.positions ?? {})) {
@@ -34,6 +45,7 @@ class CommandMapModel {
     const b=this.scenario.bounds;
     return point && Number.isFinite(point.lon) && Number.isFinite(point.lat) && point.lon>=b.west && point.lon<=b.east && point.lat>=b.south && point.lat<=b.north;
   }
+  hasPosition(id) {return this.validPosition(this.position(id));}
   position(id) { return this.positions[id] ?? this.units.get(id); }
   descendants(id) {
     const result=[]; const visit=key=>{for(const child of this.children.get(key) ?? []) {result.push(child);visit(child);}};visit(id);return result;
@@ -75,8 +87,11 @@ class CommandMapModel {
     if(!this.visible().includes(id))this.focus=id;
   }
   move(id,lon,lat,withChildren=this.moveSubtree) {
-    const before=this.position(id);const dx=lon-before.lon,dy=lat-before.lat;
-    const ids=[id,...(withChildren?this.descendants(id):[])];
+    if(!this.units.has(id)||!this.validPosition({lon,lat}))return false;
+    const before=this.position(id);
+    if(!this.hasPosition(id)){this.positions[id]={lon,lat};return true;}
+    const dx=lon-before.lon,dy=lat-before.lat;
+    const ids=[id,...(withChildren?this.descendants(id).filter(key=>this.hasPosition(key)):[])];
     const next=ids.map(key=>({id:key,lon:this.position(key).lon+dx,lat:this.position(key).lat+dy}));
     if(next.some(point=>!this.validPosition(point)))return false;
     for(const point of next)this.positions[point.id]={lon:point.lon,lat:point.lat};return true;
