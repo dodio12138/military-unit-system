@@ -111,6 +111,9 @@ const view = { x: 0, y: 0, scale: 1 };
 const minScale = .1;
 const maxScale = 2;
 let lastSize = null;
+// True once the user pans, zooms or the editor scrolls to a unit; until then
+// the canvas keeps refitting as it resizes (embedded frames often start small).
+let viewAdjusted = false;
 
 function announce(message) {
   $("announcement").textContent = message;
@@ -1265,12 +1268,14 @@ function fitView() {
       : height / 2 - 14 - (top + bottom) * view.scale / 2;
   }
   lastSize = { width, height };
+  viewAdjusted = false;
   applyView();
 }
 
 function zoomAt(scale, x = stage.clientWidth / 2, y = stage.clientHeight / 2) {
   const next = Math.max(minScale, Math.min(maxScale, scale));
   const factor = next / view.scale;
+  viewAdjusted = true;
   view.x = x - (x - view.x) * factor;
   view.y = y - (y - view.y) * factor;
   view.scale = next;
@@ -1308,6 +1313,7 @@ function reveal(unit) {
   const maxY = stage.clientHeight - 64;
   view.x += Math.max(marginX, Math.min(stage.clientWidth - marginX, x)) - x;
   view.y += Math.max(minY, Math.min(maxY, y)) - y;
+  viewAdjusted = true;
   applyView();
 }
 
@@ -1602,6 +1608,7 @@ function moveGesture(event) {
   gesture.moved = true;
   if (gesture.kind === "pan") {
     stage.classList.add("is-panning");
+    viewAdjusted = true;
     view.x = gesture.x + event.clientX - gesture.startX;
     view.y = gesture.y + event.clientY - gesture.startY;
     applyView();
@@ -2803,7 +2810,7 @@ new ResizeObserver(() => {
   const width = stage.clientWidth;
   const height = stage.clientHeight;
   if (width === lastSize.width && height === lastSize.height) return;
-  if (!chart.units.length || width < lastSize.width || height < lastSize.height) return fitView();
+  if (!viewAdjusted || !chart.units.length || width < lastSize.width || height < lastSize.height) return fitView();
   view.x += (width - lastSize.width) / 2;
   view.y += (height - lastSize.height) / 2;
   lastSize = { width, height };

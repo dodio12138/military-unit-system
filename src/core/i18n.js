@@ -529,7 +529,7 @@ const abbreviations = [
 ].map(([full, short]) => [new RegExp(`\\b${full}\\b`, "g"), short]);
 
 // Shorten an English caption when it is longer than `limit` characters.
-function brief(text, limit = 18) {
+function brief(text, limit = 14) {
   if (!english || typeof text !== "string" || text.length <= limit) return text;
   return abbreviations.reduce((result, [pattern, short]) => result.replace(pattern, short), text);
 }
