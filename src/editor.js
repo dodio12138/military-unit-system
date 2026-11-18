@@ -1257,7 +1257,9 @@ function fitView() {
     const xs = visibleUnits.map((unit) => unit.x);
     const ys = visibleUnits.map((unit) => unit.y);
     const modelLeft = Math.min(...xs) - 72;
-    const modelRight = Math.max(...visibleUnits.map((unit) => unit.x + (chart.showComposition ? 208 : unit.plateLabel !== undefined ? 132 : 72)));
+    // Side labels: English reserves the same width as arrangeReference.
+    const sideLabel = english ? 270 : 132;
+    const modelRight = Math.max(...visibleUnits.map((unit) => unit.x + (chart.showComposition ? 208 : unit.plateLabel !== undefined ? sideLabel : 72)));
     const modelTop = Math.min(...ys) - 44;
     const modelBottom = Math.max(...visibleUnits.map((unit) => unit.y + (chart.showComposition ? 32 : unit.strength || unit.estimated ? 68 : 48)));
     const {left,right,top,bottom} = projectBounds({left:modelLeft,right:modelRight,top:modelTop,bottom:modelBottom}, displayMode);
