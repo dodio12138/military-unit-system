@@ -13,31 +13,13 @@ node --test tests/*.test.cjs
 
 Pages 启用后的访问地址：https://dodio12138.github.io/military-unit-system/
 
-`.github/workflows/pages.yml` 在推送到 `main` 或手动运行时执行测试；通过后，仅将 `index.html`、`map.html`、`src/` 和 `assets/` 打包部署到 GitHub Pages。仓库的 Pages 发布源使用 GitHub Actions。
+`.github/workflows/pages.yml` 在推送到 `main` 或手动运行时执行测试；通过后，仅将 `index.html`、`src/` 和 `assets/` 打包部署到 GitHub Pages，并自动给页面引用的 CSS / JS 加上提交哈希作为版本号，避免浏览器使用旧缓存。仓库的 Pages 发布源使用 GitHub Actions。
 
 线上页面与本地页面的浏览器存储各自独立，本机已保存的编制不会自动出现在在线版本中。
 
-## 指挥地图
-
-从顶栏进入「指挥地图」，或打开 `map.html`。历史编制包含 **528 个节点**（德军306、波军222）：最高机关、集团军群、集团军、军／实际作战集群、师、旅及384个团级条目。主要序列补至团，未覆盖所有直属部队和营级分遣，不称完整战斗序列。动员编制、计划归属、附属与资料分歧均在单位说明中标记。来源见 [德军记录](docs/poland-german-oob.md)、[波军记录](docs/poland-polish-oob.md)和[高级总部](docs/poland-hq-audit.md)。
-
-地图可全屏显示；展开总兵牌后由同位置指挥部承接连线，折叠后恢复。德国和波兰默认按概化战前国界加浅色底，可单独关闭；颜色面与部队部署分离，未来可接入按日期变化的控制区，当前尚无时间线。
-
-缩放时，军、师、团兵牌直接在地图上展开，指挥连线保留。原有24个参考位置保留；新增465个按战史地域与上级部署推定的位置，共489个可定位节点，另39个因未就绪或缺乏可靠集结地域等原因继续待定位。推定兵牌带虚线框与“推”标记，悬停可看推定依据；位置不是精确总部或阵地。坐标固定，不随缩放重新分配。详见[推定部署说明](docs/poland-deployment.md)。
-
-临时手动折叠在下一次自动缩放时解除，展开锁定继续有效。用户手动保存的位置优先于新增推定。地图不再提供虚构示例切换；旧示例本地存储不与历史数据混用。
-
-点击兵牌或目录查看来源与隶属。双击或使用「展开下级」后，总兵牌由**同一坐标的指挥部兵牌替换**，指挥线从指挥部出发；折叠后恢复总兵牌，不新增单位或重复计员。待定位的中间机关保留在目录，地图以有说明的虚线压缩其连接；争议隶属用黄色虚线。多个部队共用同一地域参考点时显示数量角标，并可在侧栏切换，没有为避让而移动兵牌。
-
-滚轮缩放，拖动平移；默认不会移动兵牌。勾选「调整部署」才能拖动兵牌或编辑经纬度，可带动已有坐标的下属、撤销或恢复参考位置。支持展开锁定、阵营筛选、搜索和独立保存。地图全屏可占满窗口，原生全屏不可用时回退为窗口全图；Escape退出，均保持地理中心。全屏保留展开、叠起和战役全图操作。
-
-道路底图使用 OpenStreetMap，地形底图使用 OpenTopoMap，按当前视口联网加载，是现代地理数据。可开关的历史国界层取自 CShapes 2.0，包含波兰东部、走廊、东普鲁士和但泽参考轮廓。它是**概化国界，非逐日精确测绘或军队战线**，特别是1938–1939小规模变化及但泽记录日期存在数据限制。来源、处理与独立的 CC BY-NC-SA 4.0 数据许可证见 [历史边界说明](docs/poland-borders.md)。导出的 SVG 嵌入当前已加载底图、边界与归属说明，并过滤锁定标记。
-
-底图、历史线与兵牌使用同一 Web Mercator 投影；瓦片按屏幕像素布局，避免高倍率放大 CSS 舍入误差。缩放、响应式尺寸变化与指挥部替换均不修改部署坐标。基础资料说明见 [地图数据说明](docs/poland-1939-sources.md)。
-
 ## 代码结构
 
-- `index.html`：工作台、属性面板与对话框。
+- `index.html`：工作台、属性面板与对话框。本地开发时 `?v=` 版本号无需手动修改，部署时自动替换。
 - `src/core/config.js`：存储键、示例标识和编辑限制。
 - `src/data/presets.js`：编制模板、装备岗位、人数与装备汇总，以及新四军直属部队示例。
 - `src/data/examples.js`：完整师、八路军、新四军及各营示例图。
@@ -45,19 +27,6 @@ Pages 启用后的访问地址：https://dodio12138.github.io/military-unit-syst
 - `src/render/symbols.js`：兵种、级别、SVG 兵牌与厚度侧面绘制。
 - `src/render/projection.js`：全画布投影矩阵、逆变换与边界计算。
 - `src/render/view-mode.js`：平面 / 2.5D 切换和独立保存的显示偏好。
-- `src/map/deployment.js`：以史料地域与上级部署生成固定推定坐标，保留原始定位记录。
-- `src/data/poland-deployment-german.js` / `poland-deployment-polish.js`：推定地域来源、尺度与明确排除项。
-- `src/map/model.js`：独立的地理坐标、层级、汇总、展开锁定与存储模型。
-- `src/map/tiles.js`：当前视口瓦片加载、缓存复用、来源标注和当前视野导出。
-- `src/map/geography.js`：历史国界线投影和图层绘制。
-- `src/map/representation.js`：总兵牌与同位置指挥部的显示替换。
-- `src/map/fullscreen.js`：原生与窗口全图及退出逻辑。
-- `src/map/visibility.js`：缩放层级、视口筛选和锁定下的可见单位。
-- `src/map/controller.js`：地图渲染、部署交互、查看指挥链与导出。
-- `src/data/poland-history.js`：历史场景入口，合并总部和双方军师团数据。
-- `src/data/poland-oob-german.js` / `poland-oob-polish.js`：真实番号、隶属、定位和依据。
-- `src/data/poland-borders-1939.js`：带时间及许可元数据的概化历史国界。
-- `src/data/poland-1939.js`：旧虚构示例数据，仅保留兼容性测试，地图不加载。
 - `src/editor.js`：画布交互、编制树编辑、折叠与叠牌、撤销、属性编辑、保存和导出。
 - `assets/styles/`：工作台布局及 Pixel HUD 适配。
 - `assets/hud/`：第三方样式、字体及许可证。
