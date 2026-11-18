@@ -293,14 +293,145 @@ function newFourthArmyExample() {
   return document;
 }
 
+// Typed support branches (squad → battalion) for the WWII examples. Staffing is illustrative.
+function typedBranchPresets(definitions, type, label) {
+  const keys = ["squad", "platoon", "company", "battalion"].map((level) => `ww2-${type}-${level}`);
+  if (!definitions[keys[0]]) {
+    definitions[keys[0]] = { name: `${label}班`, type, rank: "squad", strength: [9, 9], estimated: true, role: "基层人员组 · 示例定员" };
+    definitions[keys[1]] = { name: `${label}排`, type, rank: "platoon", estimated: true, parts: [["form-platoon-hq", 1], [keys[0], 3]] };
+    definitions[keys[2]] = { name: `${label}连`, type, rank: "company", estimated: true, parts: [["form-company-hq", 1], [keys[1], 3]] };
+    definitions[keys[3]] = { name: `${label}营`, type, rank: "battalion", estimated: true, parts: [["form-battalion-hq", 1], [keys[2], 3]] };
+  }
+  return { company: keys[2], battalion: keys[3] };
+}
+
+const supportLabels = {
+  antiTank: "反坦克", artillery: "炮兵", cavalry: "侦察", engineer: "工兵", logistics: "勤务", medical: "卫生", signal: "通信", training: "补充",
+};
+
+// Shared builder: a division with regiment columns and a right rail of divisional troops.
+function ww2DivisionExample({ id, title, subtitle, prefix, division, headquarters, regiments, artillery, support }) {
+  const snapshot = id;
+  const definitions = presetTree(builtInPresets, "form-battalion");
+  Object.assign(definitions, structuredClone(presetTree(builtInPresets, "form-artillery-battalion")));
+  const document = { id, title, subtitle, reference: true, referenceLayoutVersion: 2, supportEquipmentVersion: 1,
+    referenceLayout: { root: `${prefix}-division`, headquarters: `${prefix}-division-hq`, columns: [] },
+    units: [], recipes: { [snapshot]: definitions }, stacks: {}, folded: [] };
+
+  function add(unitId, parent, definition, key) {
+    const unit = makePresetUnit(definition, 0, 0, parent, key ? { snapshot, key } : undefined);
+    unit.id = unitId;
+    unit.plateLabel = unit.name;
+    document.units.push(unit);
+    return unit;
+  }
+  function exampleUnit(unitId, parent, name, type, key, role = "下级编成与员额为示例") {
+    return add(unitId, parent, { ...definitions[key], name, type, role, estimated: true }, key);
+  }
+  function typed(unitId, parent, name, type, rank, role) {
+    const key = typedBranchPresets(definitions, type, supportLabels[type])[rank];
+    return exampleUnit(unitId, parent, name, type, key, role);
+  }
+
+  const rootId = document.referenceLayout.root;
+  add(rootId, null, division);
+  add(document.referenceLayout.headquarters, rootId, historicalCommand("师部", "division", headquarters));
+
+  for (const [index, regiment] of regiments.entries()) {
+    const regimentId = `${prefix}-regiment-${index + 1}`;
+    add(regimentId, rootId, { name: regiment.name, type: "infantry", rank: "regiment" });
+    if (regiment.commanders) add(`${regimentId}-hq`, regimentId, historicalCommand("团部", "regiment", regiment.commanders));
+    for (let battalion = 1; battalion <= 3; battalion++) {
+      exampleUnit(`${regimentId}-b${battalion}`, regimentId, `第${battalion}营`, "infantry", "form-battalion");
+    }
+    for (const [suffix, [name, type]] of regiment.companies.entries()) {
+      typed(`${regimentId}-c${suffix + 1}`, regimentId, name, type, "company");
+    }
+    document.referenceLayout.columns.push(regimentId);
+    document.folded.push(regimentId);
+  }
+
+  const artilleryId = `${prefix}-artillery`;
+  add(artilleryId, rootId, { name: artillery.name, type: "artillery", rank: artillery.rank, role: artillery.role });
+  if (artillery.commanders) add(`${artilleryId}-hq`, artilleryId, historicalCommand("指挥部", artillery.rank, artillery.commanders));
+  for (const [index, name] of artillery.battalions.entries()) {
+    exampleUnit(`${artilleryId}-b${index + 1}`, artilleryId, name, "artillery", "form-artillery-battalion", "装备编成与定员为示例");
+  }
+  document.referenceLayout.columns.push(artilleryId);
+  document.folded.push(artilleryId);
+
+  for (const [index, [name, type, rank, role]] of support.entries()) {
+    typed(`${prefix}-support-${index + 1}`, rootId, name, type, rank, role);
+  }
+  arrangeReference(document);
+  return document;
+}
+
+function usInfantryDivisionExample() {
+  return ww2DivisionExample({
+    id: usDivisionExampleId, prefix: "us1",
+    title: "美国陆军第1步兵师",
+    subtitle: "1944年6月诺曼底登陆序列 · 点击团级兵牌展开 · 营以下编成与员额为示例",
+    division: { name: "第1步兵师", type: "infantry", rank: "division", role: "1944年6月6日奥马哈海滩登陆时的主要序列" },
+    headquarters: ["师长 克拉伦斯·R·许布纳少将", "副师长 威拉德·G·怀曼准将", "参谋长 斯坦霍普·B·梅森上校"],
+    regiments: [
+      { name: "第16步兵团", commanders: ["团长 乔治·A·泰勒上校"], companies: [["加农炮连", "artillery"], ["反坦克连", "antiTank"]] },
+      { name: "第18步兵团", commanders: ["团长 小乔治·A·史密斯上校"], companies: [["加农炮连", "artillery"], ["反坦克连", "antiTank"]] },
+      { name: "第26步兵团", commanders: ["团长 约翰·F·R·塞茨上校"], companies: [["加农炮连", "artillery"], ["反坦克连", "antiTank"]] },
+    ],
+    artillery: {
+      name: "师属炮兵", rank: "brigade", role: "下辖三个105毫米与一个155毫米榴弹炮营",
+      commanders: ["炮兵指挥官 克利夫特·安德勒斯准将"],
+      battalions: ["第5野战炮兵营（155毫米）", "第7野战炮兵营（105毫米）", "第32野战炮兵营（105毫米）", "第33野战炮兵营（105毫米）"],
+    },
+    support: [
+      ["第1工兵战斗营", "engineer", "battalion"],
+      ["第1卫生营", "medical", "battalion"],
+      ["第1骑兵侦察队（机械化）", "cavalry", "company"],
+      ["第1通信连", "signal", "company"],
+      ["第1军需连", "logistics", "company"],
+      ["第701军械轻型维修连", "logistics", "company"],
+    ],
+  });
+}
+
+function germanInfantryDivisionExample() {
+  return ww2DivisionExample({
+    id: germanDivisionExampleId, prefix: "de1",
+    title: "德国陆军第1步兵师",
+    subtitle: "1939年9月波兰战役序列 · 点击团级兵牌展开 · 营以下编成与员额为示例",
+    division: { name: "第1步兵师", type: "infantry", rank: "division", role: "1939年9月隶属第3集团军，自东普鲁士出发" },
+    headquarters: ["师长 约阿希姆·冯·科茨弗莱施中将"],
+    regiments: [
+      { name: "第1步兵团", companies: [["第13（步兵炮）连", "artillery"], ["第14（反坦克）连", "antiTank"]] },
+      { name: "第22步兵团", companies: [["第13（步兵炮）连", "artillery"], ["第14（反坦克）连", "antiTank"]] },
+      { name: "第43步兵团", companies: [["第13（步兵炮）连", "artillery"], ["第14（反坦克）连", "antiTank"]] },
+    ],
+    artillery: {
+      name: "第1炮兵团", rank: "regiment", role: "三个轻型营装备10.5厘米榴弹炮；按1939年标准另配属一个15厘米重炮营",
+      battalions: ["第1营（10.5厘米轻型）", "第2营（10.5厘米轻型）", "第3营（10.5厘米轻型）", "重炮兵营（15厘米）"],
+    },
+    support: [
+      ["第1侦察营", "cavalry", "battalion"],
+      ["第1反坦克营", "antiTank", "battalion"],
+      ["第1工兵营", "engineer", "battalion"],
+      ["第1通信营", "signal", "battalion"],
+      ["第1师补给勤务部队", "logistics", "battalion"],
+      ["第1野战补充营", "training", "battalion", "1939年动员后组建，编成与员额为示例"],
+      ["卫生勤务部队", "medical", "battalion"],
+    ],
+  });
+}
+
 const additionalExamples = [
-  [infantryExampleId, infantryCompanyExample],
-  [battalionExampleId, infantryBattalionExample],
-  [artilleryBattalionExampleId, () => supportBattalionExample("artillery")],
-  [logisticsBattalionExampleId, () => supportBattalionExample("logistics")],
-  [completeDivisionId, completeDivisionExample],
-  ["example-120-complete", () => completeDivisionExample("120")],
-  ["example-129-complete", () => completeDivisionExample("129")],
+  [usDivisionExampleId, usInfantryDivisionExample],
+  [germanDivisionExampleId, germanInfantryDivisionExample],
   [armyExampleId, eighthRouteArmyExample],
   [newFourthArmyExampleId, newFourthArmyExample],
 ];
+
+// Earlier built-in examples, removed from the library on load.
+const retiredExampleIds = new Set([
+  "reference-115", infantryExampleId, battalionExampleId, artilleryBattalionExampleId, logisticsBattalionExampleId,
+  completeDivisionId, "example-120-complete", "example-129-complete",
+]);

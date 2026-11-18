@@ -43,7 +43,7 @@ function addEquipment(target, source, quantity = 1) {
 }
 
 function equipmentSummary(counts) {
-  return Object.entries(counts).map(([kind, count]) => `${equipmentKinds[kind].name} ${count.toLocaleString()} ${equipmentKinds[kind].unit}`).join(" · ");
+  return Object.entries(counts).map(([kind, count]) => t("{name} {count} {unit}", { name: tr(equipmentKinds[kind].name), count, unit: tr(equipmentKinds[kind].unit) })).join(" · ");
 }
 
 const mobileBranches = {
@@ -278,10 +278,10 @@ function presetTree(definitions, root) {
   const result = Object.create(null);
   const visiting = new Set();
   function visit(key) {
-    if (visiting.has(key)) throw new Error("预设不能直接或间接引用自身");
+    if (visiting.has(key)) throw new Error(t("预设不能直接或间接引用自身"));
     if (Object.hasOwn(result, key)) return;
     const preset = Object.hasOwn(definitions, key) && definitions[key];
-    if (!preset) throw new Error("有下级预设已不存在");
+    if (!preset) throw new Error(t("有下级预设已不存在"));
     visiting.add(key);
     for (const [child] of preset.parts ?? []) visit(child);
     visiting.delete(key);

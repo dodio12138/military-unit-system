@@ -23,28 +23,118 @@ const icons = {
 const infantryCross = '<path d="M1 1 75 47M75 1 1 47"/>';
 const tracks = '<rect class="armor-mark" x="17" y="13" width="42" height="22" rx="6" ry="6"/>';
 const shieldMark = '<path d="M29 17q5 2 9-1 4 3 9 1v6q0 8-9 11-9-3-9-11Z"/>';
-const types = {
+const trainingStar = '<circle cx="38" cy="24" r="13"/><path class="dot" d="m38 13 2.6 7.5 8 .2-6.3 4.9 2.3 7.7-6.6-4.6-6.6 4.6 2.3-7.7-6.3-4.9 8-.2Z"/>';
+const wheelSpokes = '<circle cx="38" cy="24" r="9"/><path d="M29 24h18m-9-9v18m-6-15 12 12m0-12L32 30"/>';
+
+// NATO (APP-6 / MIL-STD-2525) style icon parts on the 76 × 48 frame. Built-in
+// branches and custom symbols are composed from the same parts.
+const symbolParts = {
+  infantry: { name: "步兵交叉", drawing: infantryCross },
+  armor: { name: "装甲履带", drawing: tracks },
+  reconnaissance: { name: "侦察斜线", drawing: '<path d="M1 47 75 1"/>' },
+  artillery: { name: "炮兵圆点", drawing: '<circle class="dot" cx="38" cy="24" r="5"/>' },
+  antiTank: { name: "反坦克倒V", drawing: '<path d="M1 47 38 1l37 46"/>' },
+  engineer: { name: "工兵", drawing: '<path d="M25 19v10m0-5h26m0-5v10"/>' },
+  signal: { name: "通信闪电", drawing: '<path d="m42 13-12 12h12l-9 11"/>' },
+  medical: { name: "医疗十字", drawing: '<path d="M38 14v20M28 24h20"/>' },
+  wheels: { name: "摩托化车轮", drawing: '<circle cx="30" cy="39" r="3"/><circle cx="46" cy="39" r="3"/>' },
+  airborne: { name: "空降翼", drawing: '<path d="M26 40q6-6 12 0 6-6 12 0"/>' },
+  mountain: { name: "山地三角", drawing: '<path class="dot" d="M30 47l8-10 8 10Z"/>' },
+  amphibious: { name: "两栖波浪", drawing: '<path d="M20 40q3-4 6 0t6 0 6 0 6 0 6 0 6 0"/>' },
+  airDefense: { name: "防空弧顶", drawing: '<path d="M8 47a30 22 0 0 1 60 0"/>' },
+  mortar: { name: "迫击炮", drawing: '<path d="M38 32V13m-6 6 6-6 6 6"/><circle cx="38" cy="36" r="3"/>' },
+  rocket: { name: "火箭", drawing: '<path d="M31 33V15m-5 5 5-5 5 5M45 33V15m-5 5 5-5 5 5"/>' },
+  maintenance: { name: "维修扳手", drawing: '<path d="M27 24h22M27 18a6 6 0 0 0 0 12M49 18a6 6 0 0 1 0 12"/>' },
+  supply: { name: "补给底线", drawing: '<path d="M1 36h74"/>' },
+  transport: { name: "运输车轮", drawing: wheelSpokes },
+  gun: { name: "炮管", drawing: '<path d="M29 24h18m0-6v12"/>' },
+  headquarters: { name: "指挥横线", drawing: '<path d="M1 13h74"/>' },
+  training: { name: "教导星", drawing: trainingStar },
+  shield: { name: "盾形", drawing: shieldMark },
+};
+
+const symbolTextY = { top: 14, center: 25, bottom: 37 };
+
+function escapeSymbolText(text) {
+  return text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+
+// Compose icon parts plus optional short text (such as "MP") into frame artwork.
+function composeSymbol({ parts = [], text = "", textPosition = "center" } = {}) {
+  const artwork = parts.filter((part) => Object.hasOwn(symbolParts, part)).map((part) => symbolParts[part].drawing).join("");
+  const label = [...String(text ?? "").trim()].slice(0, 4).join("");
+  if (!label) return artwork;
+  const length = [...label].length;
+  const size = length <= 2 ? 17 : length === 3 ? 15 : 13;
+  return artwork + `<text class="symbol-text" x="38" y="${symbolTextY[textPosition] ?? symbolTextY.center}" text-anchor="middle" dominant-baseline="central" font-size="${size}" font-weight="700" font-family="Arial, Helvetica, sans-serif">${escapeSymbolText(label)}</text>`;
+}
+
+const builtInTypes = {
   general: { name: "通用", rank: "none", drawing: "" },
   infantry: { name: "步兵", rank: "company", drawing: infantryCross },
   independent: { name: "独立步兵", rank: "regiment", drawing: '<path d="M1 1 75 47M75 1 1 47M32 5v7m-3.5-3.5h7M44 5v7m-3.5-3.5h7"/>' },
-  cavalry: { name: "骑兵", rank: "battalion", drawing: '<path d="M1 47 75 1"/>' },
-  artillery: { name: "炮兵", rank: "battalion", drawing: '<circle class="dot" cx="38" cy="24" r="5"/>' },
-  engineer: { name: "工兵", rank: "battalion", drawing: '<path d="M25 19v10m0-5h26m0-5v10"/>' },
-  headquarters: { name: "指挥部", rank: "none", drawing: '<path d="M1 13h74"/>' },
-  logistics: { name: "辎重", rank: "battalion", drawing: '<circle cx="38" cy="24" r="9"/><path d="M29 24h18m-9-9v18m-6-15 12 12m0-12L32 30"/>' },
-  signal: { name: "通信", rank: "company", drawing: '<path d="m42 13-12 12h12l-9 11"/>' },
-  medical: { name: "医疗", rank: "company", drawing: '<path d="M38 14v20M28 24h20"/>' },
+  cavalry: { name: "骑兵", rank: "battalion", drawing: symbolParts.reconnaissance.drawing },
+  reconnaissance: { name: "侦察", rank: "company", drawing: symbolParts.reconnaissance.drawing + symbolParts.wheels.drawing },
+  airborne: { name: "空降步兵", rank: "battalion", drawing: composeSymbol({ parts: ["infantry", "airborne"] }) },
+  mountain: { name: "山地步兵", rank: "battalion", drawing: composeSymbol({ parts: ["infantry", "mountain"] }) },
+  marine: { name: "两栖步兵", rank: "battalion", drawing: composeSymbol({ parts: ["infantry", "amphibious"] }) },
+  specialForces: { name: "特种部队", rank: "battalion", drawing: composeSymbol({ text: "SF" }) },
+  artillery: { name: "炮兵", rank: "battalion", drawing: symbolParts.artillery.drawing },
+  mortar: { name: "迫击炮", rank: "company", drawing: symbolParts.mortar.drawing },
+  rocketArtillery: { name: "火箭炮兵", rank: "battalion", drawing: symbolParts.rocket.drawing + '<circle class="dot" cx="38" cy="38" r="3"/>' },
+  airDefense: { name: "防空", rank: "battalion", drawing: symbolParts.airDefense.drawing + '<circle class="dot" cx="38" cy="35" r="4"/>' },
+  engineer: { name: "工兵", rank: "battalion", drawing: symbolParts.engineer.drawing },
+  antiTank: { name: "反坦克", rank: "company", drawing: symbolParts.antiTank.drawing },
+  headquarters: { name: "指挥部", rank: "none", drawing: symbolParts.headquarters.drawing },
+  logistics: { name: "辎重", rank: "battalion", drawing: wheelSpokes },
+  supply: { name: "补给", rank: "company", drawing: symbolParts.supply.drawing },
+  maintenance: { name: "维修", rank: "company", drawing: symbolParts.maintenance.drawing },
+  signal: { name: "通信", rank: "company", drawing: symbolParts.signal.drawing },
+  medical: { name: "医疗", rank: "company", drawing: symbolParts.medical.drawing },
+  militaryPolice: { name: "宪兵", rank: "company", drawing: composeSymbol({ text: "MP" }) },
+  cbrn: { name: "防化", rank: "company", drawing: composeSymbol({ text: "CBRN" }) },
   shield: { name: "盾形标记", rank: "battalion", drawing: shieldMark },
   specialService: { name: "特务", rank: "battalion", drawing: shieldMark },
-  training: { name: "教导", rank: "battalion", drawing: '<circle cx="38" cy="24" r="13"/><path class="dot" d="m38 13 2.6 7.5 8 .2-6.3 4.9 2.3 7.7-6.6-4.6-6.6 4.6 2.3-7.7-6.3-4.9 8-.2Z"/>' },
+  training: { name: "教导", rank: "battalion", drawing: trainingStar },
   tank: { name: mobileBranches.tank.name, rank: "company", drawing: tracks },
   truck: { name: "卡车", rank: "team", drawing: '<path d="M18 31V17h25v6h9l6 8H18Z"/><circle class="dot" cx="27" cy="34" r="3"/><circle class="dot" cx="50" cy="34" r="3"/>' },
   mechanized: { name: mobileBranches.mechanized.name, rank: "company", drawing: infantryCross + tracks },
-  motorized: { name: mobileBranches.motorized.name, rank: "company", drawing: infantryCross + '<circle cx="30" cy="39" r="3"/><circle cx="46" cy="39" r="3"/>' },
+  motorized: { name: mobileBranches.motorized.name, rank: "company", drawing: infantryCross + symbolParts.wheels.drawing },
   armoredRecon: { name: mobileBranches.armoredRecon.name, rank: "company", drawing: tracks + '<path d="M22 31 54 17"/>' },
-  assaultGun: { name: mobileBranches.assaultGun.name, rank: "company", drawing: tracks + '<path d="M29 24h18m0-6v12"/>' },
-  selfPropelledArtillery: { name: mobileBranches.selfPropelledArtillery.name, rank: "company", drawing: tracks + '<circle class="dot" cx="38" cy="24" r="5"/>' },
+  assaultGun: { name: mobileBranches.assaultGun.name, rank: "company", drawing: tracks + symbolParts.gun.drawing },
+  selfPropelledArtillery: { name: mobileBranches.selfPropelledArtillery.name, rank: "company", drawing: tracks + symbolParts.artillery.drawing },
 };
+
+// Unknown branches (for example a deleted custom symbol in an undo snapshot)
+// draw as a plain frame instead of failing.
+const types = new Proxy({ ...builtInTypes }, {
+  get(target, key) {
+    if (typeof key !== "string" || Object.hasOwn(target, key)) return target[key];
+    return target.general;
+  },
+});
+
+const customTypePrefix = "custom-";
+
+function readCustomSymbols() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(customSymbolStorageKey));
+    if (!stored || typeof stored !== "object") return {};
+    return Object.fromEntries(Object.entries(stored).filter(([key, symbol]) => key.startsWith(customTypePrefix)
+      && typeof symbol?.name === "string" && symbol.name.trim() && Array.isArray(symbol.parts)));
+  } catch {
+    return {};
+  }
+}
+
+let customSymbols = {};
+function registerCustomSymbols(definitions) {
+  for (const key of Object.keys(types)) if (key.startsWith(customTypePrefix)) delete types[key];
+  customSymbols = definitions;
+  for (const [key, symbol] of Object.entries(definitions)) {
+    types[key] = { name: symbol.name.trim(), rank: Object.hasOwn(ranks, symbol.rank) ? symbol.rank : "company", custom: true, drawing: composeSymbol(symbol) };
+  }
+}
 
 const ranks = {
   none: { name: "无级别标记" },
@@ -64,10 +154,11 @@ const ranks = {
 };
 
 const groups = [
-  { name: "作战单位", keys: ["infantry", "independent", "cavalry", "artillery", "engineer", "shield"] },
+  { name: "作战单位", keys: ["infantry", "independent", "cavalry", "reconnaissance", "airborne", "mountain", "marine", "specialForces", "antiTank", "engineer", "shield"] },
+  { name: "火力与防空", keys: ["artillery", "mortar", "rocketArtillery", "airDefense"] },
   { name: "装甲与机动", keys: Object.keys(mobileBranches) },
   { name: "运输装备", keys: ["truck"] },
-  { name: "指挥与保障", keys: ["headquarters", "logistics", "training", "specialService", "signal", "medical"] },
+  { name: "指挥与保障", keys: ["headquarters", "logistics", "supply", "maintenance", "training", "specialService", "signal", "medical", "militaryPolice", "cbrn"] },
 ];
 
 function icon(name) {

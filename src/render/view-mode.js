@@ -20,7 +20,7 @@ function initializeViewMode() {
       render();
       fitView();
       $("empty-symbol").innerHTML = rankMark("company") + symbol("infantry");
-      announce(mode === "depth" ? "已切换到整体 2.5D 视角" : "已切换到平面兵牌");
+      announce(t(mode === "depth" ? "已切换到整体 2.5D 视角" : "已切换到平面兵牌"));
     });
   }
   syncControls();

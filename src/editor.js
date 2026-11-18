@@ -1,6 +1,16 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
+localizeDocument();
+registerCustomSymbols(readCustomSymbols());
+{
+  const toggle = $("language-toggle");
+  toggle.textContent = english ? "中文" : "EN";
+  toggle.lang = english ? "zh-CN" : "en";
+  toggle.title = english ? "切换到中文" : "Switch to English";
+  toggle.setAttribute("aria-label", toggle.title);
+  toggle.addEventListener("click", () => setLanguage(english ? "zh" : "en"));
+}
 const stage = $("stage");
 const unitsLayer = $("units");
 function readStorage(key) {
@@ -32,28 +42,39 @@ function readLibrary() {
   const stored = readStorage(storageKey);
   if (!Array.isArray(stored?.charts)) return null;
   const removed = new Set(Array.isArray(stored.removed) ? stored.removed : []);
-  const charts = stored.charts.filter((item) => isChart(item) && typeof item.id === "string" && !removed.has(item.id))
+  const charts = stored.charts.filter((item) => isChart(item) && typeof item.id === "string" && !removed.has(item.id) && !retiredExampleIds.has(item.id))
     .map((item) => {
       migrateChartStrength(item);
       if (item.id === battalionExampleId || item.referenceComplete) migrateCommandGuards(item);
       if (item.reference) migrateReferenceLayout(item);
       migrateSupportEquipment(item);
       migrateNewFourthDirectUnits(item);
+      relayoutForLanguage(item);
       return item.id === infantryExampleId ? migrateInfantryHeadquarters(item) : item;
     });
   for (const [id, create] of additionalExamples) {
-    if (!removed.has(id) && !charts.some((item) => item.id === id)) charts.push(create());
+    if (!removed.has(id) && !charts.some((item) => item.id === id)) charts.push({ ...create(), layoutLanguage: layoutStamp });
   }
   if (!charts.length) return null;
   const activeId = charts.some((item) => item.id === stored.activeId) ? stored.activeId : charts[0].id;
   return { activeId, charts, removed: [...removed] };
 }
 
+// Reference layouts reserve label width for the display language. Re-run them
+// after a language switch unless the user has arranged the chart by hand.
+// The stamp carries a version so label-width changes re-run old layouts once.
+const layoutStamp = `${language}:2`;
+function relayoutForLanguage(item) {
+  if (!item.reference || item.manualLayout || item.layoutLanguage === layoutStamp) return;
+  if ((item.layoutLanguage ?? "zh") !== layoutStamp) arrangeReference(item);
+  item.layoutLanguage = layoutStamp;
+}
+
 function loadLibrary() {
   const stored = readLibrary();
   if (stored) return stored;
-  const example = exampleChart();
-  const charts = [example, ...additionalExamples.map(([, create]) => create())];
+  const charts = additionalExamples.map(([, create]) => ({ ...create(), layoutLanguage: layoutStamp }));
+  const example = charts[0];
   const legacy = readStorage(legacyKey);
   if (isChart(legacy) && JSON.stringify(legacy) !== JSON.stringify(previousExample())) {
     return { activeId: "legacy", charts: [migrateChartStrength({ ...legacy, id: "legacy" }), ...charts] };
@@ -120,24 +141,24 @@ function refreshLibrary() {
 function save(changed = null) {
   if (presetEdit) {
     if (changed) presetDrafts.set(presetEdit.token, changed);
-    $("save-text").textContent = "预设草稿";
+    $("save-text").textContent = t("预设草稿");
     $("save-status").classList.remove("save-failed");
     return;
   }
   if (changed) unsavedCharts.set(changed.id, changed);
   refreshLibrary();
   if (!library.charts.some((item) => item.id === chart.id)) {
-    $("save-text").textContent = "此编制已被删除";
+    $("save-text").textContent = t("此编制已被删除");
     $("save-status").classList.add("save-failed");
     return;
   }
   try {
     localStorage.setItem(storageKey, JSON.stringify(library));
     unsavedCharts.clear();
-    $("save-text").textContent = "已保存在此浏览器";
+    $("save-text").textContent = t("已保存在此浏览器");
     $("save-status").classList.remove("save-failed");
   } catch {
-    $("save-text").textContent = "浏览器存储不可用";
+    $("save-text").textContent = t("浏览器存储不可用");
     $("save-status").classList.add("save-failed");
   }
 }
@@ -258,12 +279,19 @@ function documentSize(document) {
 }
 
 function strengthText(people) {
-  return `${people.toLocaleString()} 人`;
+  return t("{n} 人", { n: people });
+}
+
+function officerText(count) {
+  // Chinese templates already say 军官; English names the role after the count.
+  return english ? t("{n} 名军官", { n: count }) : strengthText(count);
 }
 
 function strengthSummary(stat) {
-  if (!stat.known) return "待定员";
-  return `${stat.incomplete ? "已录入 " : ""}${strengthText(stat.people)}${stat.estimated ? "（含推定）" : ""}`;
+  if (!stat.known) return t("待定员");
+  let text = strengthText(stat.people);
+  if (stat.incomplete) text = t("已录入 {strength}", { strength: text });
+  return stat.estimated ? t("{strength}（含推定）", { strength: text }) : text;
 }
 
 function strengthOf(unit, byParent) {
@@ -302,12 +330,12 @@ function compositionOf(unit, byParent) {
     : children.map((child) => [child.name.replace(/ \d+$/, ""), 1])) {
     names.set(name, (names.get(name) ?? 0) + quantity);
   }
-  const breakdown = names.size <= 2 ? [...names].map(([name, count]) => `${count} 个${name}`).join(" · ")
-    : `${[...names.values()].reduce((sum, count) => sum + count, 0)} 个直属下级`;
+  const breakdown = names.size <= 2 ? [...names].map(([name, count]) => t("{count} 个{name}", { count, name: tr(name) })).join(" · ")
+    : t("{count} 个直属下级", { count: [...names.values()].reduce((sum, count) => sum + count, 0) });
   const stat = strengthOf(unit, byParent);
   return {
     children: breakdown,
-    strength: unit.estimated && stat.known ? `推定 ${strengthText(stat.people)}` : strengthSummary(stat),
+    strength: unit.estimated && stat.known ? t("推定 {strength}", { strength: strengthText(stat.people) }) : strengthSummary(stat),
   };
 }
 
@@ -456,7 +484,7 @@ function toggleStack(id) {
     else chart.stacks[id] = members;
     reflowComposition();
   });
-  announce(stacked ? `已展开 ${members.length} 枚兵牌` : `已叠放 ${members.length} 枚同类兵牌`);
+  announce(t(stacked ? "已展开 {count} 枚兵牌" : "已叠放 {count} 枚同类兵牌", { count: members.length }));
 }
 
 function toggleBranch(id) {
@@ -478,7 +506,7 @@ function toggleBranch(id) {
     const first = visibleUnits.find((child) => child.parent === id);
     if (opening && first && !isUnitVisible(first)) reveal(first);
   } else if (opening && chart.units.some((child) => child.parent === id && !isUnitVisible(child))) fitView();
-  announce(opening ? `已展开${unit.name}的下级` : `已收起${unit.name}的下级`);
+  announce(t(opening ? "已展开{name}的下级" : "已收起{name}的下级", { name: tr(unit.name) }));
 }
 
 function reflowComposition() {
@@ -551,7 +579,7 @@ function collapseLayer() {
     reflowComposition();
   });
   fitView();
-  announce("已叠起一层");
+  announce(t("已叠起一层"));
 }
 
 function expandLayer() {
@@ -564,7 +592,7 @@ function expandLayer() {
     const deferred = recipe?.[unit.recipe.key]?.parts ?? [];
     return total + (deferred.length ? deferred.reduce((sum, [, count]) => sum + count, 0) : byParent.get(unit.id)?.length ?? 0);
   }, 0);
-  if (count + visibleUnits.length > maxFullExpansion) return editorFeedback("这一层单位较多，请分支展开");
+  if (count + visibleUnits.length > maxFullExpansion) return editorFeedback(t("这一层单位较多，请分支展开"));
   commit(() => {
     const opening = new Set();
     for (const unit of layer) {
@@ -578,7 +606,7 @@ function expandLayer() {
     reflowComposition();
   });
   fitView();
-  announce("已展开一层");
+  announce(t("已展开一层"));
 }
 
 function expandedSize(frozen) {
@@ -601,7 +629,7 @@ function expandAll() {
     reflowComposition();
   });
   fitView();
-  announce("已展开全部层级");
+  announce(t("已展开全部层级"));
 }
 
 function stackIdentical() {
@@ -617,14 +645,14 @@ function stackIdentical() {
     groups.get(key).push(unit.id);
   }
   const matching = [...groups.values()].filter((group) => group.length > 1);
-  if (!matching.length) return editorFeedback("各分支当前末层没有可叠放的同类单位");
+  if (!matching.length) return editorFeedback(t("各分支当前末层没有可叠放的同类单位"));
   commit(() => {
     chart.stacks ??= {};
     for (const ids of matching) chart.stacks[ids[0]] = ids;
     reflowComposition();
   });
   fitView();
-  announce(`已叠放 ${matching.length} 组同类单位`);
+  announce(t("已叠放 {count} 组同类单位", { count: matching.length }));
 }
 
 function expandAncestors(parent) {
@@ -651,15 +679,16 @@ function chartDepth() {
 }
 
 function plateCaption(unit, stacked = false) {
-  if (unit.plateLabel) return unit.plateLabel;
+  if (unit.plateLabel) return brief(tr(unit.plateLabel));
   const battalion = /^(步兵|教导)营 ([1-3])$/.exec(unit.name);
   if (unit.plateLabel === "" && unit.rank === "battalion" && battalion) {
-    return stacked ? `${battalion[1]}营` : `第${battalion[2]}营`;
+    return brief(tr(stacked ? `${battalion[1]}营` : `第${battalion[2]}营`));
   }
-  return unit.name === "师部指挥部" ? "师部" : unit.name;
+  return brief(tr(unit.name === "师部指挥部" ? "师部" : unit.name));
 }
 
 function isReferenceBranch(unit, document = chart) {
+  if (document.referenceLayout) return document.referenceLayout.columns.includes(unit.id);
   if (document.referenceNewFourthArmy) {
     return unit.parent === "new-fourth-army" && /^n4-detachment-[1-4]$/.test(unit.id);
   }
@@ -680,17 +709,17 @@ function unitElement(unit, composition, children) {
   node.style.top = `${unit.y}px`;
   const locked = chart.expansionLocks?.includes(unit.id);
 
-  const rank = unit.rank === "none" ? "" : `，${ranks[unit.rank].name}级`;
+  const rank = unit.rank === "none" ? "" : `${t("，")}${t("{rank}级", { rank: tr(ranks[unit.rank].name) })}`;
   const details = composition ? [composition.children, composition.strength].filter(Boolean) : [];
-  if (!composition && unit.estimated) details.push(`推定 ${strengthText(strengthOf(unit, children).people)}`);
-  else if (!composition && unit.strength && !unit.rosterOnly) details.push(fixedStrength(unit.strength) ? strengthText(unit.strength[0]) : "待定员");
-  const stackDescription = count > 1 ? [`${count} 枚叠牌`] : [];
-  node.setAttribute("aria-label", [`${unit.name}，${types[unit.type].name}${rank}`, ...details, ...stackDescription, ...(locked ? ["展开已锁定"] : [])].join("，"));
+  if (!composition && unit.estimated) details.push(t("推定 {strength}", { strength: strengthText(strengthOf(unit, children).people) }));
+  else if (!composition && unit.strength && !unit.rosterOnly) details.push(fixedStrength(unit.strength) ? strengthText(unit.strength[0]) : t("待定员"));
+  const stackDescription = count > 1 ? [t("{count} 枚叠牌", { count })] : [];
+  node.setAttribute("aria-label", [`${tr(unit.name)}${t("，")}${tr(types[unit.type].name)}${rank}`, ...details, ...stackDescription, ...(locked ? [t("展开已锁定")] : [])].join(t("，")));
   node.setAttribute("aria-pressed", String(unit.id === selectedId));
   node.innerHTML = `<span class="unit-rank">${rankMark(unit.rank)}</span>${symbol(unit.type, count > 1)}<span class="unit-label"></span>`;
   const label = plateCaption(unit, count > 1);
   node.lastElementChild.textContent = unit.equipment && label
-    ? `${label} · 1${equipmentKinds[unit.equipment.kind].unit}` : label;
+    ? `${label} · 1${english ? " " : ""}${tr(equipmentKinds[unit.equipment.kind].unit)}` : label;
   node.lastElementChild.hidden = !label;
   if (isReferenceBranch(unit) && children.has(unit.id)) {
     const closed = chart.folded?.includes(unit.id);
@@ -850,8 +879,8 @@ function saveChartImage() {
         for (const [name, value] of Object.entries(position(glyph))) shape.setAttribute(name, value);
         shape.setAttribute("color", getComputedStyle(glyph).color);
         shape.setAttribute("overflow", "visible");
-        const originals = glyph.querySelectorAll("g, rect, path, circle, ellipse");
-        const copies = shape.querySelectorAll("g, rect, path, circle, ellipse");
+        const originals = glyph.querySelectorAll("g, rect, path, circle, ellipse, text");
+        const copies = shape.querySelectorAll("g, rect, path, circle, ellipse, text");
         originals.forEach((part, index) => {
           const style = getComputedStyle(part);
           for (const property of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"]) {
@@ -879,13 +908,13 @@ function saveChartImage() {
     Object.assign(bounds, projectBounds(bounds, displayMode));
     const padding = 32;
     const header = 88;
-    const width = Math.ceil(Math.max(bounds.right - bounds.left, chart.title.length * 28, 320) + padding * 2);
+    const width = Math.ceil(Math.max(bounds.right - bounds.left, captionLength(tr(chart.title)) * 28, 320) + padding * 2);
     const height = Math.ceil(bounds.bottom - bounds.top + header + padding * 2);
     const image = svgElement("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img" });
     image.append(
-      svgElement("title", {}, chart.title),
+      svgElement("title", {}, tr(chart.title)),
       svgElement("rect", { width, height, fill: background }),
-      svgElement("text", { x: padding, y: 51, fill: chartTitle.color, "font-size": 28, "font-weight": 600, "font-family": chartTitle.fontFamily }, chart.title),
+      svgElement("text", { x: padding, y: 51, fill: chartTitle.color, "font-size": 28, "font-weight": 600, "font-family": chartTitle.fontFamily }, tr(chart.title)),
       svgElement("text", { x: padding, y: 76, fill: chartTitle.color, "font-size": 13, "font-family": getComputedStyle(unitsLayer).fontFamily }, $("chart-description").textContent),
     );
     artwork.setAttribute("transform", `translate(${padding - bounds.left} ${header + padding - bounds.top}) matrix(${projectionMatrix(displayMode).join(" ")} 0 0)`);
@@ -895,12 +924,12 @@ function saveChartImage() {
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${chart.title.replace(/[\\/:*?"<>|]/g, "_")}.svg`;
+    link.download = `${tr(chart.title).replace(/[\\/:*?"<>|]/g, "_")}.svg`;
     document.body.append(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    announce("已导出当前编制图");
+    announce(t("已导出当前编制图"));
   } finally {
     $("world").style.transform = previousTransform;
   }
@@ -913,21 +942,21 @@ function render() {
   const { units, children } = visibleProjection();
   visibleUnits = units;
   if (!visibleUnits.some((unit) => unit.id === selectedId)) selectedId = null;
-  $("chart-title").textContent = chart.title;
-  document.title = `${chart.title} · 兵牌编辑器`;
+  $("chart-title").textContent = tr(chart.title);
+  document.title = t("{title} · 兵牌编辑器", { title: tr(chart.title) });
   $("preset-edit-actions").hidden = !presetEdit;
   $("new-chart").hidden = Boolean(presetEdit);
   $("chart-library").hidden = Boolean(presetEdit);
   $("manage-presets").hidden = Boolean(presetEdit);
-  $("chart-description").textContent = presetEdit ? "预设编制图" : chart.equipmentFormation ? "装备编成与定员示例 · 逐层展开查看装备和乘员" : chart.showComposition ? "编制示例"
+  $("chart-description").textContent = presetEdit ? t("预设编制图") : chart.subtitle ? tr(chart.subtitle) : t(chart.equipmentFormation ? "装备编成与定员示例 · 逐层展开查看装备和乘员" : chart.showComposition ? "编制示例"
     : chart.referenceNewFourthArmy ? "1938年春初建序列 · 点击支队兵牌展开 · 补充编成与员额为示例"
     : chart.referenceArmy ? "1937年改编初期 · 点击师级兵牌展开 · 补充编成与员额为示例"
     : chart.referenceComplete && ["120", "129"].includes(chart.referenceDivision) ? "1937年8月改编序列 · 下级编成与员额为示例"
     : chart.referenceComplete ? "参考图结构 · 补充编制与员额为示例"
-      : chart.reference ? "国民革命军第八路军" : chart.example ? "第八路军 · 示例编制" : "自建编制";
+      : chart.reference ? "国民革命军第八路军" : chart.example ? "第八路军 · 示例编制" : "自建编制");
   const size = documentSize(chart);
   const hidden = size - visibleUnits.length;
-  $("chart-stats").textContent = `${size.toLocaleString()} 个单位 · ${chartDepth()} 层编制${hidden ? ` · 折叠 ${hidden.toLocaleString()} 个` : ""}`;
+  $("chart-stats").textContent = t("{size} 个单位 · {depth} 层编制", { size, depth: chartDepth() }) + (hidden ? t(" · 折叠 {hidden} 个", { hidden }) : "");
   $("empty").hidden = chart.units.length > 0;
   $("arrange").disabled = chart.units.length === 0;
   $("save-image").disabled = visibleUnits.length === 0;
@@ -936,7 +965,7 @@ function render() {
   const { frozen, ancestors } = expansionLocks();
   const expandableSize = frozen.size ? expandedSize(frozen) : size;
   $("expand-all").disabled = expandableSize <= visibleUnits.length || expandableSize > maxFullExpansion;
-  $("expand-all").title = expandableSize > maxFullExpansion ? "编制较大，请逐层展开" : "展开未锁定的编制和叠牌";
+  $("expand-all").title = t(expandableSize > maxFullExpansion ? "编制较大，请逐层展开" : "展开未锁定的编制和叠牌");
   $("stack-peers").disabled = branchEndUnits(new Set([...frozen, ...ancestors])).length < 2;
   const { past, future } = historyForChart();
   $("undo").disabled = !past.length;
@@ -964,19 +993,19 @@ function renderInspector() {
   $("unit-fields").hidden = !unit;
   if (!unit) return;
   $("inspector-symbol").innerHTML = rankMark(unit.rank) + symbol(unit.type);
-  $("inspector-caption").textContent = unit.name;
-  $("unit-name").value = unit.name;
-  $("unit-type").value = unit.type;
+  $("inspector-caption").textContent = tr(unit.name);
+  $("unit-name").value = tr(unit.name);
+  $("unit-type").value = knownType(unit.type);
   $("unit-rank").value = unit.rank;
   $("unit-rank").disabled = Boolean(unit.equipment);
   const blocked = descendants(unit.id);
   const parents = chart.units.filter((candidate) => !blocked.has(candidate.id));
-  $("unit-parent").replaceChildren(option("", "无上级（独立单位）"), ...parents.map((candidate) => option(candidate.id, candidate.name)));
+  $("unit-parent").replaceChildren(option("", t("无上级（独立单位）")), ...parents.map((candidate) => option(candidate.id, tr(candidate.name))));
   $("unit-parent").value = unit.parent ?? "";
   const byParent = indexChildren();
   const stat = strengthOf(unit, byParent);
   $("unit-role").hidden = !unit.role;
-  $("unit-role").textContent = unit.role ?? "";
+  $("unit-role").textContent = tr(unit.role ?? "");
   const children = byParent.get(unit.id)?.length ?? 0;
   const deferred = hasDeferredChildren(unit);
   const hasRoster = Boolean(unit.personnel?.length);
@@ -985,24 +1014,26 @@ function renderInspector() {
   $("unit-equipment-summary").hidden = !Object.keys(stat.equipment).length;
   $("unit-equipment-summary").textContent = equipmentSummary(stat.equipment);
   const totalText = stat.known && !stat.incomplete
-    ? `编制人数 ${unit.estimated ? `推定 ${strengthText(stat.people)}` : strengthSummary(stat)}` : strengthSummary(stat);
+    ? t("编制人数 {strength}", { strength: unit.estimated ? t("推定 {strength}", { strength: strengthText(stat.people) }) : strengthSummary(stat) }) : strengthSummary(stat);
   $("unit-strength-summary").hidden = (!stat.known && !unit.strength && !children && !deferred)
     || (showOwnSummary && !children && !deferred);
-  $("unit-strength-summary").textContent = stat.officers ? `${totalText} · 军官 ${strengthText(stat.officers)}` : totalText;
+  $("unit-strength-summary").textContent = stat.officers ? t("{total} · 军官 {officers}", { total: totalText, officers: officerText(stat.officers) }) : totalText;
   $("unit-headcount").value = fixedStrength(unit.strength) ? unit.strength[0] : "";
-  $("unit-headcount").placeholder = unit.strength && !fixedStrength(unit.strength) ? "填写固定人数" : "上级可由下级汇总";
+  $("unit-headcount").placeholder = t(unit.strength && !fixedStrength(unit.strength) ? "填写固定人数" : "上级可由下级汇总");
   $("unit-headcount").closest("label").hidden = showOwnSummary;
   $("unit-staff-summary").hidden = !showOwnSummary;
   const ownPeople = personnelTotal(unit.personnel);
   const ownOfficers = officerTotal(unit.personnel);
-  $("unit-staff-summary").textContent = unit.rosterOnly ? `已录 ${ownPeople} 项主要岗位`
-    : `${equipment ? "乘员" : "本部"} ${unit.estimated ? "推定 " : ""}${strengthText(ownPeople)} · 军官 ${strengthText(ownOfficers)}`;
+  const ownStrength = unit.estimated ? t("推定 {strength}", { strength: strengthText(ownPeople) }) : strengthText(ownPeople);
+  $("unit-staff-summary").textContent = unit.rosterOnly ? t("已录 {count} 项主要岗位", { count: ownPeople })
+    : t(equipment ? "乘员 {strength} · 军官 {officers}" : "本部 {strength} · 军官 {officers}", { strength: ownStrength, officers: officerText(ownOfficers) });
   $("unit-subordinate-summary").hidden = !showOwnSummary || (!children && !deferred) || !stat.known;
   const subordinateStrength = strengthText(stat.people - (unit.rosterOnly ? 0 : ownPeople));
-  const subordinateOfficers = strengthText(stat.officers - (unit.rosterOnly ? 0 : ownOfficers));
-  $("unit-subordinate-summary").textContent = `${stat.incomplete ? "下辖已录入" : "下辖"} ${subordinateStrength}${stat.estimated ? "（含推定）" : ""} · 军官 ${subordinateOfficers}`;
+  let subordinateText = stat.incomplete ? t("已录入 {strength}", { strength: subordinateStrength }) : subordinateStrength;
+  if (stat.estimated) subordinateText = t("{strength}（含推定）", { strength: subordinateText });
+  $("unit-subordinate-summary").textContent = t("下辖 {strength} · 军官 {officers}", { strength: subordinateText, officers: officerText(stat.officers - (unit.rosterOnly ? 0 : ownOfficers)) });
   $("edit-unit-staff").hidden = !supportsPersonnel(unit);
-  $("edit-unit-staff").textContent = equipment ? "编辑乘员" : "编辑本部人员";
+  $("edit-unit-staff").textContent = t(equipment ? "编辑乘员" : "编辑本部人员");
   const locks = expansionLocks();
   const locked = locks.roots.has(unit.id);
   const inherited = locks.frozen.has(unit.id) && !locked;
@@ -1010,16 +1041,16 @@ function renderInspector() {
   lock.hidden = !locked && !inherited && !children && !deferred && !displayedStacks.has(unit.id);
   lock.disabled = inherited;
   lock.setAttribute("aria-pressed", String(locked || inherited));
-  lock.textContent = locked ? "解除展开锁定" : inherited ? "上级已锁定展开" : "锁定展开状态";
-  lock.title = "保留此分支当前的展开、折叠和叠牌状态";
+  lock.textContent = t(locked ? "解除展开锁定" : inherited ? "上级已锁定展开" : "锁定展开状态");
+  lock.title = t("保留此分支当前的展开、折叠和叠牌状态");
   $("fold-branch").hidden = (!children && !deferred) || displayedStacks.has(unit.id);
   $("fold-branch").disabled = locks.frozen.has(unit.id) || locks.ancestors.has(unit.id);
-  $("fold-branch").textContent = deferred || chart.folded?.includes(unit.id) ? "展开下级" : "收起下级";
+  $("fold-branch").textContent = t(deferred || chart.folded?.includes(unit.id) ? "展开下级" : "收起下级");
   const stack = $("fold-peers");
   const peers = stackPeers(unit);
   stack.hidden = peers.length < 2;
-  stack.textContent = displayedStacks.has(unit.id) ? "展开叠牌" : `叠放同类兵牌（${peers.length} 枚）`;
-  $("delete-unit").title = children || deferred ? "下级单位将转接至该单位的上级" : "删除单位";
+  stack.textContent = displayedStacks.has(unit.id) ? t("展开叠牌") : t("叠放同类兵牌（{count} 枚）", { count: peers.length });
+  $("delete-unit").title = t(children || deferred ? "下级单位将转接至该单位的上级" : "删除单位");
 }
 
 function selectUnit(id, openInspector = false) {
@@ -1053,27 +1084,27 @@ function showUnitTooltip(node, x, y) {
   tooltip.replaceChildren();
   const heading = document.createElement("div");
   heading.className = "hud-titlebar";
-  heading.textContent = unit.name;
+  heading.textContent = tr(unit.name);
   tooltip.append(heading);
   const body = document.createElement("div");
   body.className = "tooltip-body";
-  const rows = [["单位", [ranks[unit.rank].name, types[unit.type].name].filter(Boolean).join(" · ")]];
+  const rows = [[t("单位"), [ranks[unit.rank].name, types[unit.type].name].filter(Boolean).map(tr).join(" · ")]];
   const stacked = displayedStacks.get(unit.id)?.length ?? 0;
-  if (stacked > 1) rows.push(["叠牌", `${stacked} 枚 · 下方为单枚兵牌数据`]);
-  if (Object.keys(stat.equipment).length) rows.push(["装备", equipmentSummary(stat.equipment)]);
-  if (composition.children) rows.push(["组成", composition.children]);
+  if (stacked > 1) rows.push([t("叠牌"), t("{count} 枚 · 下方为单枚兵牌数据", { count: stacked })]);
+  if (Object.keys(stat.equipment).length) rows.push([t("装备"), equipmentSummary(stat.equipment)]);
+  if (composition.children) rows.push([t("组成"), composition.children]);
   if (unit.type === "headquarters") {
-    if (own) rows.push(["本部人员", `${unit.estimated ? "推定 " : ""}${strengthText(own)}`]);
-    if (unit.rosterOnly) rows.push(["本部岗位", `已录 ${personnelTotal(unit.personnel)} 项，不计入员额`]);
-    if (composition.children && stat.known) rows.push(["下辖人员", strengthText(stat.people - own)]);
+    if (own) rows.push([t("本部人员"), unit.estimated ? t("推定 {strength}", { strength: strengthText(own) }) : strengthText(own)]);
+    if (unit.rosterOnly) rows.push([t("本部岗位"), t("已录 {count} 项，不计入员额", { count: personnelTotal(unit.personnel) })]);
+    if (composition.children && stat.known) rows.push([t("下辖人员"), strengthText(stat.people - own)]);
   }
   if (unit.equipment) {
-    rows.push(["乘员", strengthText(own)], ["定员说明", "示例定员，可按型号修改"]);
+    rows.push([t("乘员"), strengthText(own)], [t("定员说明"), t("示例定员，可按型号修改")]);
   }
-  rows.push(["合计人数", composition.strength]);
-  if (stat.officers) rows.push(["军官", strengthText(stat.officers)]);
-  if (unit.personnel?.length) rows.push(["主要岗位", unit.personnel.map(entry => `${entry.role} ${entry.count}人`).join("、")]);
-  if (chart.expansionLocks?.includes(unit.id)) rows.push(["展开状态", "已锁定"]);
+  rows.push([t("合计人数"), composition.strength]);
+  if (stat.officers) rows.push([t("军官"), strengthText(stat.officers)]);
+  if (unit.personnel?.length) rows.push([t("主要岗位"), unit.personnel.map(entry => t("{role} {count}人", { role: tr(entry.role), count: entry.count })).join(t("、"))]);
+  if (chart.expansionLocks?.includes(unit.id)) rows.push([t("展开状态"), t("已锁定")]);
   for (const [name, value] of rows) {
     const row = document.createElement("div");
     row.className = "tooltip-row";
@@ -1105,7 +1136,7 @@ function openUnitMenu(unit, x, y) {
   const menu = $("unit-context-menu");
   menu.replaceChildren();
   menu.dataset.unit = unit.id;
-  menu.setAttribute("aria-label", `${unit.name}快捷操作`);
+  menu.setAttribute("aria-label", t("{name}快捷操作", { name: tr(unit.name) }));
   for (const id of ["fold-branch", "fold-peers", "lock-expansion", "edit-unit-staff"]) {
     const control = $(id);
     if (control.hidden) continue;
@@ -1125,7 +1156,7 @@ function openUnitMenu(unit, x, y) {
   properties.type = "button";
   properties.className = "hud-menu__item";
   properties.setAttribute("role", "menuitem");
-  properties.textContent = "单位属性";
+  properties.textContent = t("单位属性");
   properties.addEventListener("click", () => {
     closeUnitMenu();
     switchTab("unit");
@@ -1168,14 +1199,14 @@ function setPlacement(type) {
   const tip = $("canvas-tip");
   tip.classList.remove("is-feedback");
   if (type) {
-    tip.textContent = `点按画布放置${paletteItem(type).name} · Esc 取消`;
+    tip.textContent = t("点按画布放置{name} · Esc 取消", { name: tr(paletteItem(type).name) });
     announce(tip.textContent);
   } else if (chart.showComposition) {
-    tip.textContent = matchMedia("(pointer: coarse)").matches ? "拖动画布查看下方单位" : "滚动查看下方单位";
+    tip.textContent = t(matchMedia("(pointer: coarse)").matches ? "拖动画布查看下方单位" : "滚动查看下方单位");
   } else if (matchMedia("(pointer: coarse)").matches) {
-    tip.textContent = "拖动空白处平移";
+    tip.textContent = t("拖动空白处平移");
   } else {
-    tip.innerHTML = "<kbd>空格</kbd> 平移画布";
+    tip.innerHTML = `<kbd>${t("空格")}</kbd> ${t("平移画布")}`;
   }
 }
 
@@ -1332,14 +1363,14 @@ function materializeChildren(parent) {
 }
 
 function addUnit(key, parent, point) {
-  if (parent?.equipment) return editorFeedback("单件装备的人员请通过“编辑乘员”配置");
+  if (parent?.equipment) return editorFeedback(t("单件装备的人员请通过“编辑乘员”配置"));
   const definition = paletteItem(key);
   const fromCatalog = Object.hasOwn(presets, key);
   const catalog = fromCatalog ? presets : builtInPresets;
   const presetKey = fromCatalog ? key : defaultPresetKey(definition.rank, definition.type);
   let unit;
   setPlacement(null);
-  if (!staffedPreset(catalog, presetKey)) return editorFeedback("请先补齐预设的下级组成和固定人数");
+  if (!staffedPreset(catalog, presetKey)) return editorFeedback(t("请先补齐预设的下级组成和固定人数"));
   commit(() => {
     if (parent) materializeChildren(parent);
     const { x, y } = parent
@@ -1352,7 +1383,7 @@ function addUnit(key, parent, point) {
     chart.units.push(unit);
   });
   reveal(unit);
-  announce(parent ? `已将${unit.name}编入${parent.name}` : `已放置${unit.name}`);
+  announce(parent ? t("已将{name}编入{parent}", { name: tr(unit.name), parent: tr(parent.name) }) : t("已放置{name}", { name: tr(unit.name) }));
 }
 
 function updateUnit(fields, movingIds) {
@@ -1361,21 +1392,21 @@ function updateUnit(fields, movingIds) {
   const moving = "parent" in fields && fields.parent !== unit.parent;
   if (moving && !canRemoveFromParent(unit)) {
     render();
-    return editorFeedback("上级至少要保留一个下级单位");
+    return editorFeedback(t("上级至少要保留一个下级单位"));
   }
   const hasChildren = hasDeferredChildren(unit) || chart.units.some((child) => child.parent === unit.id);
   const nextType = fields.type ?? unit.type;
   const nextRank = fields.rank ?? unit.rank;
   if (unit.equipment && (!equipmentKinds[nextType] || nextRank !== "team")) {
     renderInspector();
-    return editorFeedback("单件装备使用机组级别，请选择装备兵种");
+    return editorFeedback(t("单件装备使用机组级别，请选择装备兵种"));
   }
   if (moving && getUnit(fields.parent)?.equipment) {
     renderInspector();
-    return editorFeedback("单件装备的人员请通过“编辑乘员”配置");
+    return editorFeedback(t("单件装备的人员请通过“编辑乘员”配置"));
   }
   if ("strength" in fields && ((!fields.strength && !hasChildren) || (fields.strength && !fixedStrength(fields.strength)))) {
-    return editorFeedback("基层单位需要固定的正整数人数");
+    return editorFeedback(t("基层单位需要固定的正整数人数"));
   }
   commit(() => {
     if (moving) {
@@ -1414,7 +1445,7 @@ function deleteSelected() {
   const unit = getUnit(selectedId);
   if (!unit) return;
   const hasChildren = hasDeferredChildren(unit) || chart.units.some((child) => child.parent === unit.id);
-  if (!hasChildren && !canRemoveFromParent(unit)) return editorFeedback("上级至少要保留一个下级单位");
+  if (!hasChildren && !canRemoveFromParent(unit)) return editorFeedback(t("上级至少要保留一个下级单位"));
   commit(() => {
     materializeChildren(unit);
     for (const child of chart.units) {
@@ -1425,12 +1456,13 @@ function deleteSelected() {
     chart.expansionLocks = chart.expansionLocks?.filter((id) => id !== unit.id);
     selectedId = unit.parent;
   });
-  announce(`已删除${unit.name}`);
+  announce(t("已删除{name}", { name: tr(unit.name) }));
 }
 
 function arrangeReference(document) {
   const division = document.referenceDivision ?? "115";
-  const newFourthArmy = document.referenceNewFourthArmy;
+  const layout = document.referenceLayout;
+  const newFourthArmy = document.referenceNewFourthArmy || Boolean(layout);
   const anchors = new Map();
   const anchorDivisions = document.referenceArmy ? Object.keys(divisionReferences) : newFourthArmy ? [] : [division];
   for (const number of anchorDivisions) {
@@ -1448,7 +1480,8 @@ function arrangeReference(document) {
 
   function place(unit, x, y, connector) {
     Object.assign(unit, { x, y, connector });
-    const labelWidth = unit.plateLabel === undefined ? 60 : 54 + plateCaption(unit, true).length * 15;
+    // Labels grow when zoomed out, so English side labels reserve their full width.
+    const labelWidth = unit.plateLabel === undefined ? 60 : 54 + (english ? 216 : Math.min(captionLength(plateCaption(unit, true)) * 15, 150));
     right = Math.max(right, x + labelWidth);
   }
 
@@ -1508,8 +1541,8 @@ function arrangeReference(document) {
   }
 
   const roots = peers(null);
-  const rootId = newFourthArmy ? "new-fourth-army" : document.referenceArmy ? "eighth-route-army" : division;
-  const headquartersId = newFourthArmy ? `${rootId}-hq` : document.referenceArmy ? "army-hq" : "staff";
+  const rootId = layout?.root ?? (newFourthArmy ? "new-fourth-army" : document.referenceArmy ? "eighth-route-army" : division);
+  const headquartersId = layout?.headquarters ?? (newFourthArmy ? `${rootId}-hq` : document.referenceArmy ? "army-hq" : "staff");
   const root = roots.find((unit) => unit.id === rootId);
   if (root) formation(root, 460, 76, "reference-root", headquartersId, newFourthArmy || document.referenceArmy);
   for (const unit of roots) if (unit !== root) branch(unit, Math.max(unit.x, right + 76), unit.y);
@@ -1612,7 +1645,7 @@ function finishGesture(event, cancelled = false) {
     const { unit, branchIds } = finished;
     if (cancelled || (finished.moved && (!target.inside || branchIds.has(target.unit?.id)))) {
       previewBranch(finished);
-      if (!cancelled && target.unit) announce("不能将单位编入自身的下级");
+      if (!cancelled && target.unit) announce(t("不能将单位编入自身的下级"));
       return;
     }
     if (!finished.moved) {
@@ -1640,8 +1673,8 @@ function finishGesture(event, cancelled = false) {
 for (const element of document.querySelectorAll("[data-icon]")) element.innerHTML = icon(element.dataset.icon);
 $("brand-mark").innerHTML = '<svg viewBox="0 0 24 18" fill="none" stroke="currentColor" stroke-width="1.35"><path d="M2 2.5h20v13H2zM2 2.5l20 13m0-13L2 15.5"/></svg>';
 $("empty-symbol").innerHTML = rankMark("company") + symbol("infantry");
-$("unit-type").replaceChildren(...Object.entries(types).map(([key, type]) => option(key, type.name)));
-$("unit-rank").replaceChildren(...Object.entries(ranks).map(([key, rank]) => option(key, rank.name)));
+renderTypeOptions();
+$("unit-rank").replaceChildren(...Object.entries(ranks).map(([key, rank]) => option(key, tr(rank.name))));
 
 function paletteItem(key) {
   if (Object.hasOwn(presets, key)) return presets[key];
@@ -1649,7 +1682,7 @@ function paletteItem(key) {
   return {
     ...builtInPresets[defaultPresetKey(type.rank, key)],
     type: key, rank: type.rank,
-    name: type.rank === "none" || (type.rank === "team" && equipmentKinds[key]) ? type.name : type.name + ranks[type.rank].name,
+    name: type.custom || type.rank === "none" || (type.rank === "team" && equipmentKinds[key]) ? type.name : type.name + ranks[type.rank].name,
   };
 }
 
@@ -1658,20 +1691,21 @@ function renderPalette() {
   const isFormation = paletteMode === "formation";
   const own = Object.keys(presetOverrides).filter((key) => !Object.hasOwn(builtInPresets, key) && !presetOverrides[key].internalFor);
   const entries = isFormation
-    ? [...(own.length ? [{ name: "自定义", keys: own }] : []), ...formationGroups]
-    : groups;
+    ? [...(own.length ? [{ name: t("自定义"), keys: own }] : []), ...formationGroups]
+    : [...groups, { name: "自定义标识", keys: Object.keys(customSymbols), custom: true }];
   $("formation-mode").setAttribute("aria-pressed", String(isFormation));
   $("symbol-mode").setAttribute("aria-pressed", String(!isFormation));
-  $("palette-hint").textContent = isFormation ? "拖动兵牌到画布，或点击后放置" : "拖入兵牌时带上该级别的基础编制";
+  $("palette-hint").textContent = t(isFormation ? "拖动兵牌到画布，或点击后放置" : "拖入兵牌时带上该级别的基础编制");
   const count = entries.reduce((total, group) => total + group.keys.length, 0);
-  $("preset-count").textContent = `${count} ${isFormation ? "份" : "枚"}`;
+  $("preset-count").textContent = t(isFormation ? "{count} 份" : "{count} 枚", { count });
   items.classList.toggle("formation-palette", isFormation);
   items.replaceChildren();
   const memo = new Map();
   for (const group of entries) {
     const section = document.createElement("section");
     section.className = "preset-group";
-    section.innerHTML = `<h3>${group.name}</h3><div class="preset-grid"></div>`;
+    section.innerHTML = `<h3></h3><div class="preset-grid"></div>`;
+    section.firstElementChild.textContent = tr(group.name);
     for (const key of group.keys) {
       const preset = paletteItem(key);
       const button = document.createElement("button");
@@ -1679,20 +1713,40 @@ function renderPalette() {
       button.className = "preset hud-row";
       button.dataset.type = key;
       button.setAttribute("aria-pressed", String(placement === key));
-      button.setAttribute("aria-label", isFormation ? preset.name : types[key].name);
+      button.setAttribute("aria-label", tr(isFormation ? preset.name : types[key].name));
       button.innerHTML = `<span class="preset-mark">${rankMark(preset.rank)}${symbol(preset.type)}</span><span class="preset-copy"><span class="preset-name"></span><small class="preset-detail" hidden></small></span><span class="preset-grip" aria-hidden="true">${icon("grip")}</span>`;
-      button.querySelector(".preset-name").textContent = isFormation ? preset.name : types[key].name;
+      button.querySelector(".preset-name").textContent = tr(isFormation ? preset.name : types[key].name);
       if (isFormation) {
         const stat = presetStats(presets, key, memo);
         const detail = button.querySelector(".preset-detail");
         const parts = preset.parts ?? [];
         detail.textContent = parts.length
-          ? parts.map(([child, count]) => `${count} × ${presets[child].name}`).join(" · ")
-          : preset.equipment ? `1 ${equipmentKinds[preset.equipment.kind].unit} · 乘员 ${strengthText(stat.people)}` : strengthSummary(stat);
+          ? parts.map(([child, count]) => `${count} × ${brief(tr(presets[child].name), 0)}`).join(" · ")
+          : preset.equipment ? t("1 {unit} · 乘员 {strength}", { unit: tr(equipmentKinds[preset.equipment.kind].unit), strength: strengthText(stat.people) }) : strengthSummary(stat);
         detail.hidden = !detail.textContent;
-        button.title = [preset.role, strengthSummary(stat)].filter(Boolean).join(" · ");
+        button.title = [tr(preset.role), strengthSummary(stat)].filter(Boolean).join(" · ");
       }
-      section.lastElementChild.append(button);
+      if (group.custom) {
+        const slot = document.createElement("div");
+        slot.className = "preset-slot";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "icon-button hud-icon-btn preset-edit-symbol";
+        edit.innerHTML = icon("pencil");
+        edit.setAttribute("aria-label", t("编辑标识：{name}", { name: types[key].name }));
+        edit.title = edit.getAttribute("aria-label");
+        edit.addEventListener("click", () => openSymbolDialog(key));
+        slot.append(button, edit);
+        section.lastElementChild.append(slot);
+      } else section.lastElementChild.append(button);
+    }
+    if (group.custom) {
+      const create = document.createElement("button");
+      create.type = "button";
+      create.className = "preset-new hud-row";
+      create.textContent = t("+ 新建标识");
+      create.addEventListener("click", () => openSymbolDialog());
+      section.lastElementChild.append(create);
     }
     items.append(section);
   }
@@ -1719,6 +1773,11 @@ $("preset-groups").addEventListener("click", (event) => {
 });
 $("preset-groups").addEventListener("contextmenu", (event) => {
   const key = event.target.closest(".preset")?.dataset.type;
+  if (key && Object.hasOwn(customSymbols, key) && paletteMode === "symbol") {
+    event.preventDefault();
+    openSymbolDialog(key);
+    return;
+  }
   if (!key || !Object.hasOwn(presets, key)) return;
   event.preventDefault();
   editBasePreset(key);
@@ -1726,6 +1785,155 @@ $("preset-groups").addEventListener("contextmenu", (event) => {
 $("formation-mode").addEventListener("click", () => switchPalette("formation"));
 $("symbol-mode").addEventListener("click", () => switchPalette("symbol"));
 renderPalette();
+// Custom symbols: user-composed NATO-style branches stored in this browser.
+const symbolDialog = $("symbol-dialog");
+const helpDialog = $("help-dialog");
+let editingSymbol = null;
+let symbolPartsDraft = new Set();
+
+function knownType(key) {
+  return Object.hasOwn(types, key) ? key : "general";
+}
+
+function renderTypeOptions() {
+  $("unit-type").replaceChildren(...Object.entries(types).map(([key, type]) => option(key, tr(type.name))));
+}
+
+function symbolDraft() {
+  return {
+    name: $("symbol-name").value.trim(),
+    parts: Object.keys(symbolParts).filter((part) => symbolPartsDraft.has(part)),
+    text: $("symbol-text").value.trim(),
+    textPosition: $("symbol-text-position").value,
+    rank: $("symbol-rank").value,
+  };
+}
+
+function frameMarkup(drawing) {
+  return `<svg class="unit-symbol" viewBox="0 0 76 48" aria-hidden="true"><g class="symbol-ink"><rect class="symbol-frame" x="1" y="1" width="74" height="46"/>${drawing}</g></svg>`;
+}
+
+function renderSymbolPreview() {
+  const draft = symbolDraft();
+  $("symbol-preview").innerHTML = rankMark(draft.rank) + frameMarkup(composeSymbol(draft));
+  for (const button of $("symbol-parts").children) {
+    button.setAttribute("aria-pressed", String(symbolPartsDraft.has(button.dataset.part)));
+  }
+}
+
+function openSymbolDialog(key = null) {
+  editingSymbol = key;
+  const existing = key ? customSymbols[key] : null;
+  symbolPartsDraft = new Set(existing?.parts ?? []);
+  $("symbol-dialog-title").textContent = t(existing ? "编辑标识" : "新建标识");
+  $("symbol-name").value = existing?.name ?? "";
+  $("symbol-text").value = existing?.text ?? "";
+  $("symbol-text-position").value = existing?.textPosition ?? "center";
+  $("symbol-rank").replaceChildren(...Object.entries(ranks).map(([rank, value]) => option(rank, tr(value.name))));
+  $("symbol-rank").value = existing?.rank ?? "company";
+  $("symbol-parts").replaceChildren(...Object.entries(symbolParts).map(([part, value]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "symbol-part hud-row";
+    button.dataset.part = part;
+    button.innerHTML = `${frameMarkup(value.drawing)}<span></span>`;
+    button.lastElementChild.textContent = tr(value.name);
+    return button;
+  }));
+  $("delete-symbol").hidden = !existing;
+  $("symbol-error").hidden = true;
+  renderSymbolPreview();
+  symbolDialog.showModal();
+  $("symbol-name").focus();
+}
+
+function writeCustomSymbols(definitions) {
+  try {
+    localStorage.setItem(customSymbolStorageKey, JSON.stringify(definitions));
+  } catch {
+    throw new Error(t("浏览器未能保存标识"));
+  }
+  registerCustomSymbols(definitions);
+  renderTypeOptions();
+  renderPalette();
+  render();
+}
+
+// Units and presets that used a deleted symbol fall back to the general frame.
+function retireSymbol(key) {
+  const retype = (item) => {
+    if (item?.type !== key) return false;
+    item.type = "general";
+    return true;
+  };
+  const retypeDocument = (document) => {
+    let changed = false;
+    for (const unit of document.units ?? []) changed = retype(unit) || changed;
+    for (const recipe of Object.values(document.recipes ?? {})) {
+      for (const definition of Object.values(recipe)) changed = retype(definition) || changed;
+    }
+    return changed;
+  };
+  refreshLibrary();
+  for (const item of library.charts) if (retypeDocument(item)) unsavedCharts.set(item.id, item);
+  if (retypeDocument(chart)) unsavedCharts.set(chart.id, chart);
+  if (Object.values(presetOverrides).map(retype).some(Boolean)) {
+    presets = { ...builtInPresets, ...presetOverrides };
+    try { localStorage.setItem(presetStorageKey, JSON.stringify(presetOverrides)); } catch { /* Kept in memory. */ }
+  }
+  const records = wholePresetRecords();
+  if (records.map((record) => retypeDocument(record.chart)).some(Boolean)) writeWholePresets(records);
+  save();
+}
+
+$("symbol-parts").addEventListener("click", (event) => {
+  const button = event.target.closest(".symbol-part");
+  if (!button) return;
+  const part = button.dataset.part;
+  if (!symbolPartsDraft.delete(part)) symbolPartsDraft.add(part);
+  renderSymbolPreview();
+});
+for (const id of ["symbol-text", "symbol-text-position", "symbol-rank"]) $(id).addEventListener("input", renderSymbolPreview);
+$("cancel-symbol").addEventListener("click", () => symbolDialog.close());
+$("symbol-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const draft = symbolDraft();
+  const error = $("symbol-error");
+  error.hidden = true;
+  if (!draft.name) error.textContent = t("请填写标识名称");
+  else if (!draft.parts.length && !draft.text) error.textContent = t("请至少选择一个图形组件或填写文字");
+  if (!draft.name || (!draft.parts.length && !draft.text)) {
+    error.hidden = false;
+    return;
+  }
+  const key = editingSymbol ?? `${customTypePrefix}${makeId()}`;
+  try {
+    writeCustomSymbols({ ...customSymbols, [key]: draft });
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.hidden = false;
+    return;
+  }
+  symbolDialog.close();
+  announce(t("已保存标识{name}", { name: draft.name }));
+});
+$("delete-symbol").addEventListener("click", () => {
+  const key = editingSymbol;
+  if (!key) return;
+  confirmRemoval(t("标识"), customSymbols[key].name, () => {
+    const remaining = { ...customSymbols };
+    delete remaining[key];
+    writeCustomSymbols(remaining);
+    retireSymbol(key);
+    render();
+    symbolDialog.close();
+    announce(t("已删除标识"));
+  });
+});
+
+$("open-help").addEventListener("click", () => helpDialog.showModal());
+$("close-help").addEventListener("click", () => helpDialog.close());
+
 
 stage.addEventListener("pointerdown", (event) => {
   if (gesture || (event.button !== 0 && event.button !== 1)) return;
@@ -1857,7 +2065,7 @@ for (const tab of ["preset", "unit"]) {
 $("unit-name").addEventListener("change", (event) => {
   const name = event.target.value.trim();
   if (name) updateUnit({ name });
-  else event.target.value = getUnit(selectedId)?.name ?? "";
+  else event.target.value = tr(getUnit(selectedId)?.name ?? "");
 });
 $("unit-name").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.isComposing) event.target.blur();
@@ -1889,7 +2097,7 @@ $("lock-expansion").addEventListener("click", () => {
   if (!locked && frozen.has(unit.id)) return;
   if (!locked) roots.add(unit.id);
   commit(() => { chart.expansionLocks = [...roots]; });
-  announce(locked ? `已解除${unit.name}的展开锁定` : `已锁定${unit.name}的展开状态`);
+  announce(t(locked ? "已解除{name}的展开锁定" : "已锁定{name}的展开状态", { name: tr(unit.name) }));
 });
 
 const titleInput = $("title-input");
@@ -1899,11 +2107,11 @@ function finishRename(cancel = false) {
   titleInput.hidden = true;
   $("chart-title").hidden = false;
   $("rename-chart").hidden = false;
-  if (!cancel && title && title !== chart.title) commit(() => { chart.title = title; });
+  if (!cancel && title && title !== chart.title && title !== tr(chart.title)) commit(() => { chart.title = title; });
 }
 
 $("rename-chart").addEventListener("click", () => {
-  titleInput.value = chart.title;
+  titleInput.value = tr(chart.title);
   $("chart-title").hidden = true;
   $("rename-chart").hidden = true;
   titleInput.hidden = false;
@@ -1922,7 +2130,7 @@ const libraryMenu = $("chart-library");
 const librarySummary = libraryMenu.querySelector("summary");
 
 function renderLibrary() {
-  $("library-count").textContent = `${library.charts.length} 份`;
+  $("library-count").textContent = t("{count} 份编制", { count: library.charts.length });
   $("chart-list").replaceChildren(...library.charts.map((item) => {
     const wrapper = document.createElement("div");
     wrapper.className = "chart-list-row";
@@ -1933,11 +2141,11 @@ function renderLibrary() {
     const current = item.id === chart.id;
     if (current) row.setAttribute("aria-current", "true");
     row.innerHTML = `<span data-icon="diagram">${icon("diagram")}</span><span><span class="chart-entry-name"></span><span class="chart-entry-detail"></span></span><span data-icon="check">${current ? icon("check") : ""}</span>`;
-    row.querySelector(".chart-entry-name").textContent = item.title;
-    const kind = item.referenceComplete ? "补全示例 · " : item.reference ? "原图示例 · " : item.showComposition ? "分级示例 · " : "";
-    row.querySelector(".chart-entry-detail").textContent = `${kind}${documentSize(item).toLocaleString()} 个单位`;
-    row.title = item.title;
-    const remove = trashButton(`删除编制：${item.title}`);
+    row.querySelector(".chart-entry-name").textContent = tr(item.title);
+    const kind = t(item.referenceLayout || item.referenceArmy || item.referenceNewFourthArmy ? "史料示例 · " : item.referenceComplete ? "补全示例 · " : item.reference ? "原图示例 · " : item.showComposition ? "分级示例 · " : "");
+    row.querySelector(".chart-entry-detail").textContent = t("{kind}{size} 个单位", { kind, size: documentSize(item) });
+    row.title = tr(item.title);
+    const remove = trashButton(t("删除编制：{title}", { title: tr(item.title) }));
     remove.classList.add("chart-delete");
     remove.dataset.id = item.id;
     wrapper.append(row, remove);
@@ -1972,7 +2180,7 @@ $("chart-list").addEventListener("click", (event) => {
   if (remove) {
     refreshLibrary();
     const item = library.charts.find((entry) => entry.id === remove.dataset.id);
-    if (item) confirmRemoval("编制", item.title, () => deleteChart(item.id));
+    if (item) confirmRemoval(t("编制"), tr(item.title), () => deleteChart(item.id));
     return;
   }
   const entry = event.target.closest(".chart-entry");
@@ -1982,7 +2190,7 @@ $("chart-list").addEventListener("click", (event) => {
   libraryMenu.open = false;
   if (next && next.id !== chart.id) {
     activateChart(next);
-    announce(`已切换到${chart.title}`);
+    announce(t("已切换到{title}", { title: tr(chart.title) }));
   }
   librarySummary.focus({ preventScroll: true });
 });
@@ -2012,8 +2220,8 @@ function trashButton(label) {
 
 function confirmRemoval(kind, title, action) {
   deleteAction = action;
-  $("delete-dialog-title").textContent = `删除${kind}`;
-  $("delete-description").textContent = `确定删除「${title}」？`;
+  $("delete-dialog-title").textContent = t("删除{kind}", { kind });
+  $("delete-description").textContent = t("确定删除「{title}」？", { title });
   $("delete-error").hidden = true;
   deleteDialog.showModal();
 }
@@ -2034,20 +2242,20 @@ $("delete-form").addEventListener("submit", (event) => {
 function deleteChart(id) {
   refreshLibrary();
   const remaining = library.charts.filter((item) => item.id !== id);
-  if (!remaining.length) remaining.push({ id: makeId(), title: "未命名编制", units: [] });
+  if (!remaining.length) remaining.push({ id: makeId(), title: t("未命名编制"), units: [] });
   const next = remaining.find((item) => item.id === chart.id) ?? remaining[0];
   const updated = { activeId: next.id, charts: remaining, removed: [...new Set([...(library.removed ?? []), id])] };
   try {
     localStorage.setItem(storageKey, JSON.stringify(updated));
   } catch {
-    throw new Error("浏览器未能保存删除操作");
+    throw new Error(t("浏览器未能保存删除操作"));
   }
   library = updated;
   unsavedCharts.clear();
   histories.delete(id);
   if (chart.id !== next.id) activateChart(next);
   else renderLibrary();
-  announce("已删除编制");
+  announce(t("已删除编制"));
 }
 
 function wholePresetRecords() {
@@ -2072,7 +2280,7 @@ function writeWholePresets(records) {
   try {
     localStorage.setItem(wholePresetStorageKey, JSON.stringify(records));
   } catch {
-    throw new Error("浏览器未能保存预设");
+    throw new Error(t("浏览器未能保存预设"));
   }
 }
 
@@ -2087,10 +2295,8 @@ function builtInWholePresets() {
     { id: "builtin-whole-battalion", builtIn: true, title: "步兵营编制", chart: infantryBattalionExample() },
     { id: "builtin-whole-artillery-battalion", builtIn: true, title: "炮兵营编制", chart: supportBattalionExample("artillery") },
     { id: "builtin-whole-logistics-battalion", builtIn: true, title: "辎重营编制", chart: supportBattalionExample("logistics") },
-    ...["115", "120", "129"].map((division) => {
-      const example = completeDivisionExample(division);
-      return { id: `builtin-whole-${division}`, builtIn: true, title: example.title, chart: example };
-    }),
+    { id: "builtin-whole-us-1st-infantry", builtIn: true, title: "美国陆军第1步兵师", chart: usInfantryDivisionExample() },
+    { id: "builtin-whole-german-1st-infantry", builtIn: true, title: "德国陆军第1步兵师", chart: germanInfantryDivisionExample() },
     { id: "builtin-whole-eighth-route-army", builtIn: true, title: "八路军总编制", chart: eighthRouteArmyExample() },
     { id: "builtin-whole-new-fourth-army", builtIn: true, title: "新四军总编制", chart: newFourthArmyExample() },
     { id: "builtin-whole-corps", builtIn: true, title: "军团编制", chart: { title: "军团编制", units: [root], recipes: { [snapshot]: definitions } } },
@@ -2106,16 +2312,16 @@ function renderPresetManager() {
     const copy = document.createElement("div");
     const title = document.createElement("span");
     title.className = "chart-entry-name";
-    title.textContent = record.title;
+    title.textContent = tr(record.title);
     const detail = document.createElement("small");
     detail.className = "chart-entry-detail";
-    detail.textContent = `${record.builtIn ? "内置" : "自定义"} · ${documentSize(record.chart).toLocaleString()} 个单位`;
+    detail.textContent = t(record.builtIn ? "内置 · {size} 个单位" : "自定义 · {size} 个单位", { size: documentSize(record.chart) });
     copy.append(title, detail);
     const use = document.createElement("button");
     use.type = "button";
     use.className = "button secondary hud-btn";
-    use.textContent = "使用";
-    use.setAttribute("aria-label", `使用预设：${record.title}`);
+    use.textContent = t("使用");
+    use.setAttribute("aria-label", t("使用预设：{title}", { title: tr(record.title) }));
     use.addEventListener("click", () => {
       const next = structuredClone(record.chart);
       next.id = makeId();
@@ -2123,13 +2329,13 @@ function renderPresetManager() {
       library.charts.unshift(next);
       presetManager.close();
       activateChart(next, true);
-      announce(`已从预设新建${next.title}`);
+      announce(t("已从预设新建{title}", { title: tr(next.title) }));
     });
     const edit = document.createElement("button");
     edit.type = "button";
     edit.className = "button secondary hud-btn";
-    edit.textContent = "编辑";
-    edit.setAttribute("aria-label", `编辑预设：${record.title}`);
+    edit.textContent = t("编辑");
+    edit.setAttribute("aria-label", t("编辑预设：{title}", { title: tr(record.title) }));
     edit.addEventListener("click", () => editWholePreset(record));
     row.addEventListener("contextmenu", (event) => {
       event.preventDefault();
@@ -2137,11 +2343,11 @@ function renderPresetManager() {
     });
     row.append(copy, edit, use);
     if (!record.builtIn) {
-      const remove = trashButton(`删除预设：${record.title}`);
-      remove.addEventListener("click", () => confirmRemoval("预设", record.title, () => {
+      const remove = trashButton(t("删除预设：{title}", { title: tr(record.title) }));
+      remove.addEventListener("click", () => confirmRemoval(t("预设"), tr(record.title), () => {
         writeWholePresets(wholePresetRecords().filter((item) => item.id !== record.id));
         renderPresetManager();
-        announce("已删除预设");
+        announce(t("已删除预设"));
       }));
       row.append(remove);
     }
@@ -2150,21 +2356,21 @@ function renderPresetManager() {
 }
 
 function requireStaffedChart() {
-  if (!chart.units.length) throw new Error("请先在画布上搭建编制");
+  if (!chart.units.length) throw new Error(t("请先在画布上搭建编制"));
   const children = indexChildren();
   for (const unit of chart.units) {
     if (!validEquipment(unit) || (unit.equipment && (children.has(unit.id) || hasDeferredChildren(unit)))) {
-      throw new Error("单件装备须配置固定乘员岗位，不能包含下级单位");
+      throw new Error(t("单件装备须配置固定乘员岗位，不能包含下级单位"));
     }
-    if (unit.strength && !fixedStrength(unit.strength)) throw new Error("请先补齐编制里的固定人数");
+    if (unit.strength && !fixedStrength(unit.strength)) throw new Error(t("请先补齐编制里的固定人数"));
     const recipe = recipeOf(unit);
     if (recipe) {
       const { key } = unit.recipe;
       const current = { ...recipe, [key]: { ...recipe[key], strength: unit.strength, personnel: unit.personnel } };
-      if (!staffedPreset(current, key)) throw new Error("请先补齐编制里的固定人数和下级组成");
+      if (!staffedPreset(current, key)) throw new Error(t("请先补齐编制里的固定人数和下级组成"));
     }
     if (!recipe && !children.has(unit.id) && !isStaffedLeaf(unit)) {
-      throw new Error("请先补齐编制里的固定人数和下级组成");
+      throw new Error(t("请先补齐编制里的固定人数和下级组成"));
     }
   }
   return children;
@@ -2203,7 +2409,7 @@ function editBasePreset(key) {
 
 function exportBasePreset(edit, children) {
   const roots = children.get(null) ?? [];
-  if (roots.length !== 1) throw new Error("基础模板须有一个顶级单位，请把独立单位编入同一上级");
+  if (roots.length !== 1) throw new Error(t("基础模板须有一个顶级单位，请把独立单位编入同一上级"));
   const overrides = readPresetOverrides();
   const catalog = { ...builtInPresets, ...overrides };
   for (const [key, definition] of Object.entries(overrides)) {
@@ -2257,9 +2463,9 @@ $("save-preset-edit").addEventListener("click", () => {
     presetEdit.title = chart.title;
     presetDrafts.delete(presetEdit.token);
     if ($("canvas-tip").classList.contains("is-feedback")) setPlacement(placement);
-    $("save-text").textContent = "预设已保存";
+    $("save-text").textContent = t("预设已保存");
     render();
-    announce("预设已保存");
+    announce(t("预设已保存"));
   } catch (error) {
     editorFeedback(error.message);
   }
@@ -2288,11 +2494,11 @@ $("save-formation-preset").addEventListener("submit", (event) => {
   const title = $("formation-preset-name").value.trim();
   $("manager-error").hidden = true;
   try {
-    if (!title) throw new Error("请填写预设名称");
+    if (!title) throw new Error(t("请填写预设名称"));
     requireStaffedChart();
     writeWholePresets([{ id: makeId(), title, chart }, ...wholePresetRecords()]);
     renderPresetManager();
-    announce(`已保存整套预设${title}`);
+    announce(t("已保存整套预设{title}", { title }));
   } catch (error) {
     $("manager-error").textContent = error.message;
     $("manager-error").hidden = false;
@@ -2301,7 +2507,7 @@ $("save-formation-preset").addEventListener("submit", (event) => {
 
 $("unit-headcount").addEventListener("change", (event) => {
   const input = event.target;
-  if (!input.validity.valid) return editorFeedback("请输入有效的固定人数");
+  if (!input.validity.valid) return editorFeedback(t("请输入有效的固定人数"));
   const strength = input.value ? [input.valueAsNumber, input.valueAsNumber] : undefined;
   const unit = getUnit(selectedId);
   if (!unit || String(unit.strength) === String(strength)) return;
@@ -2320,29 +2526,29 @@ function readStaffRows() {
 
 function renderStaffTotal() {
   const personnel = readStaffRows();
-  $("staff-total").textContent = `${getUnit(selectedId)?.equipment ? "乘员" : "本部"} ${strengthText(personnelTotal(personnel))} · 军官 ${strengthText(officerTotal(personnel))}`;
+  $("staff-total").textContent = t(getUnit(selectedId)?.equipment ? "乘员 {strength} · 军官 {officers}" : "本部 {strength} · 军官 {officers}", { strength: strengthText(personnelTotal(personnel)), officers: officerText(officerTotal(personnel)) });
 }
 
 function addStaffRow(entry = { role: "", count: 1, officer: false }) {
   const row = document.createElement("div");
   row.className = "staff-row";
   const role = document.createElement("input");
-  role.setAttribute("aria-label", "岗位");
+  role.setAttribute("aria-label", t("岗位"));
   role.required = true;
   role.maxLength = 32;
-  role.value = entry.role;
+  role.value = tr(entry.role);
   const count = document.createElement("input");
-  count.setAttribute("aria-label", "岗位人数");
+  count.setAttribute("aria-label", t("岗位人数"));
   count.type = "number";
   count.min = 1;
   count.max = 9999999;
   count.required = true;
   count.value = entry.count;
   const officer = document.createElement("input");
-  officer.setAttribute("aria-label", "计为军官");
+  officer.setAttribute("aria-label", t("计为军官"));
   officer.type = "checkbox";
   officer.checked = entry.officer;
-  const remove = trashButton("移除此岗位");
+  const remove = trashButton(t("移除此岗位"));
   remove.addEventListener("click", () => {
     row.remove();
     renderStaffTotal();
@@ -2356,9 +2562,9 @@ function addStaffRow(entry = { role: "", count: 1, officer: false }) {
 $("edit-unit-staff").addEventListener("click", () => {
   const unit = getUnit(selectedId);
   if (!supportsPersonnel(unit)) return;
-  $("staff-dialog-title").textContent = `${unit.name} · ${unit.equipment ? "乘员配置" : "本部人员"}`;
-  $("staff-description").textContent = unit.equipment ? "配置这一辆车或这一门炮的操作人员，按岗位合计人数；默认岗位为可修改示例" : "本部岗位独立计员，下辖单位的人数另计";
-  $("save-staff").textContent = unit.equipment ? "保存乘员" : "保存本部人员";
+  $("staff-dialog-title").textContent = t(unit.equipment ? "{name} · 乘员配置" : "{name} · 本部人员", { name: tr(unit.name) });
+  $("staff-description").textContent = t(unit.equipment ? "配置这一辆车或这一门炮的操作人员，按岗位合计人数；默认岗位为可修改示例" : "本部岗位独立计员，下辖单位的人数另计");
+  $("save-staff").textContent = t(unit.equipment ? "保存乘员" : "保存本部人员");
   $("staff-error").hidden = true;
   $("staff-rows").replaceChildren();
   if (unit.personnel?.length) {
@@ -2378,7 +2584,7 @@ $("staff-form").addEventListener("submit", (event) => {
   const personnel = readStaffRows();
   const count = personnelTotal(personnel);
   if (!personnel.length || personnel.some((entry) => !entry.role || !Number.isInteger(entry.count) || entry.count < 1) || count > 9999999) {
-    $("staff-error").textContent = "请填写至少一个岗位，人数为正整数，合计不超过 9,999,999 人";
+    $("staff-error").textContent = t("请填写至少一个岗位，人数为正整数，合计不超过 9,999,999 人");
     $("staff-error").hidden = false;
     return;
   }
@@ -2397,11 +2603,11 @@ function addPartRow(key = "", quantity = 1) {
   const row = document.createElement("div");
   row.className = "part-row";
   const select = document.createElement("select");
-  select.setAttribute("aria-label", "下级预设");
+  select.setAttribute("aria-label", t("下级预设"));
   select.required = true;
-  select.append(option("", "选择下级预设"));
+  select.append(option("", t("选择下级预设")));
   for (const [id, preset] of Object.entries(presets)) {
-    if (id !== $("preset-picker").value && (!preset.internalFor || id === key)) select.append(option(id, preset.name));
+    if (id !== $("preset-picker").value && (!preset.internalFor || id === key)) select.append(option(id, tr(preset.name)));
   }
   select.value = key;
   const count = document.createElement("input");
@@ -2410,11 +2616,11 @@ function addPartRow(key = "", quantity = 1) {
   count.max = 24;
   count.required = true;
   count.value = quantity;
-  count.setAttribute("aria-label", "下级数量");
+  count.setAttribute("aria-label", t("下级数量"));
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "icon-button hud-icon-btn";
-  remove.setAttribute("aria-label", "移除此下级");
+  remove.setAttribute("aria-label", t("移除此下级"));
   remove.innerHTML = icon("trash");
   remove.addEventListener("click", () => row.remove());
   row.append(select, count, remove);
@@ -2425,10 +2631,10 @@ function addPartRow(key = "", quantity = 1) {
 function loadPresetForm() {
   const preset = presets[$("preset-picker").value];
   $("open-template-canvas").hidden = !preset;
-  $("preset-name").value = preset?.name ?? "";
+  $("preset-name").value = tr(preset?.name ?? "");
   $("preset-type").value = preset?.type ?? "general";
   $("preset-rank").value = preset?.rank ?? "team";
-  $("preset-role").value = preset?.role ?? "";
+  $("preset-role").value = tr(preset?.role ?? "");
   $("preset-headcount").value = fixedStrength(preset?.strength) ? preset.strength[0] : "";
   $("preset-equipment").checked = Boolean(preset?.equipment);
   syncPresetEquipmentForm();
@@ -2439,10 +2645,10 @@ function loadPresetForm() {
 
 $("edit-templates").addEventListener("click", () => {
   const picker = $("preset-picker");
-  picker.replaceChildren(option("", "新建预设"), ...Object.entries(presets)
-    .filter(([, preset]) => !preset.internalFor).map(([key, preset]) => option(key, preset.name)));
-  $("preset-type").replaceChildren(...Object.entries(types).map(([key, type]) => option(key, type.name)));
-  $("preset-rank").replaceChildren(...Object.entries(ranks).map(([key, rank]) => option(key, rank.name)));
+  picker.replaceChildren(option("", t("新建预设")), ...Object.entries(presets)
+    .filter(([, preset]) => !preset.internalFor).map(([key, preset]) => option(key, tr(preset.name))));
+  $("preset-type").replaceChildren(...Object.entries(types).map(([key, type]) => option(key, tr(type.name))));
+  $("preset-rank").replaceChildren(...Object.entries(ranks).map(([key, rank]) => option(key, tr(rank.name))));
   loadPresetForm();
   presetDialog.showModal();
 });
@@ -2474,18 +2680,18 @@ function writeBasePresets(changes, key) {
   const next = { ...builtInPresets, ...changes };
   const stats = new Map();
   presetTree(next, key);
-  if (!staffedPreset(next, key)) throw new Error("上级预设必须包含下级组成，基层单位必须填写固定人数");
+  if (!staffedPreset(next, key)) throw new Error(t("上级预设必须包含下级组成，基层单位必须填写固定人数"));
   for (const id of Object.keys(next)) {
     presetTree(next, id);
     const stat = presetStats(next, id, stats);
-    if (stat.size > 100000000 || !Number.isSafeInteger(stat.people)) throw new Error("嵌套规模过大，请减少下级数量");
+    if (stat.size > 100000000 || !Number.isSafeInteger(stat.people)) throw new Error(t("嵌套规模过大，请减少下级数量"));
   }
   try {
     localStorage.setItem(presetStorageKey, JSON.stringify(changes));
   } catch {
-    throw new Error("浏览器未能保存预设");
+    throw new Error(t("浏览器未能保存预设"));
   }
-  presets = next;
+  presetOverrides
   presetOverrides = changes;
 }
 
@@ -2495,13 +2701,13 @@ $("preset-form").addEventListener("submit", (event) => {
   try {
     const key = $("preset-picker").value || `form-${makeId()}`;
     const name = $("preset-name").value.trim();
-    if (!name) throw new Error("请填写预设名称");
+    if (!name) throw new Error(t("请填写预设名称"));
     const parts = new Map();
     for (const row of $("part-rows").children) {
       const [select, quantity] = row.children;
       parts.set(select.value, (parts.get(select.value) ?? 0) + quantity.valueAsNumber);
     }
-    if ([...parts.values()].some((count) => count > 24)) throw new Error("每种下级预设最多 24 份");
+    if ([...parts.values()].some((count) => count > 24)) throw new Error(t("每种下级预设最多 24 份"));
     const headcount = $("preset-headcount").valueAsNumber;
     const type = $("preset-type").value;
     const equipment = $("preset-equipment").checked ? { kind: type } : undefined;
@@ -2520,7 +2726,7 @@ $("preset-form").addEventListener("submit", (event) => {
     setPlacement(null);
     paletteMode = "formation";
     renderPalette();
-    announce(`已保存预设${name}`);
+    announce(t("已保存预设{name}", { name }));
   } catch (error) {
     setPresetError(error.message);
   }
@@ -2533,17 +2739,18 @@ $("new-chart").addEventListener("click", () => {
 $("cancel-new").addEventListener("click", () => newDialog.close());
 $("new-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  const title = $("new-title").value.trim() || "未命名编制";
+  const title = $("new-title").value.trim() || t("未命名编制");
   const next = { id: makeId(), title, units: [] };
   library.charts.unshift(next);
   newDialog.close();
   activateChart(next, true);
   stage.focus({ preventScroll: true });
-  announce(`已创建${title}`);
+  announce(t("已创建{title}", { title }));
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.isComposing || newDialog.open || presetDialog.open || presetManager.open || deleteDialog.open || staffDialog.open
+      || symbolDialog.open || helpDialog.open
       || event.target.matches("input, select, textarea, [contenteditable]")) return;
   if (gesture) return;
   const key = event.key.toLowerCase();

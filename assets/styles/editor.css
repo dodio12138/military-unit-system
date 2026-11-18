@@ -190,6 +190,7 @@ h1 { font-family: "Songti SC", "Noto Serif CJK SC", SimSun, serif; font-size: 40
 .symbol-frame { fill: #76b6c0; }
 .symbol-ink { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
 .symbol-ink .dot { fill: currentColor; stroke: none; }
+.symbol-ink .symbol-text { fill: currentColor; stroke: none; }
 .unit-label {
   align-self: center;
   max-width: 144px;
@@ -206,9 +207,9 @@ h1 { font-family: "Songti SC", "Noto Serif CJK SC", SimSun, serif; font-size: 40
 .unit.has-strength { grid-template-rows: 18px 48px minmax(36px, auto); }
 .plate-strength { display: block; color: var(--secondary); font-size: max(12px, calc(var(--label-size, 14px) * .85)); line-height: 1.2; font-weight: 400; }
 .unit.has-composition { grid-template-rows: 18px 48px; }
-.unit.has-composition .unit-label { position: absolute; top: 16px; left: calc(100% + 12px); max-width: 156px; text-align: left; font-size: clamp(14px, var(--label-size, 14px), 20px); line-height: 20px; }
+.unit.has-composition .unit-label { position: absolute; top: 42px; transform: translateY(-50%); left: calc(100% + 12px); max-width: 156px; text-align: left; font-size: clamp(14px, var(--label-size, 14px), 20px); line-height: 20px; }
 .unit.has-composition .plate-strength { font-size: clamp(12px, calc(var(--label-size, 14px) * .9), 17px); line-height: 16px; }
-.unit.label-right .unit-label { position: absolute; left: calc(100% + 12px); top: 20px; }
+.unit.label-right .unit-label { position: absolute; left: calc(100% + 12px); top: 42px; transform: translateY(-50%); }
 .unit.reference-root .unit-symbol { transform: scale(1.28); }
 .unit.reference-root .unit-rank { transform: translateY(-6px); }
 .unit.reference-root .unit-label { left: calc(100% + 20px); }
@@ -414,3 +415,48 @@ dialog p { margin: 8px 0 16px; color: var(--secondary); }
 .unit.moving { pointer-events: none; }
 .save-failed [data-icon] { display: none; }
 #empty-symbol .rank-mark { margin-inline: auto; }
+
+/* English labels are longer; layout reserves the matching width in arrangeReference. */
+html[lang="en"] .unit.label-right .unit-label { max-width: 216px; }
+html[lang="en"] .unit.has-composition .unit-label { max-width: 200px; }
+.language-toggle { min-width: 52px; }
+@media (max-width: 480px) {
+  /* Keep the top bar on one line: the mark alone identifies the app. */
+  html[lang="en"] .brand > span:last-child { display: none; }
+  html[lang="en"] .formation-tools { display: grid; grid-template-columns: 1fr 1fr; }
+}
+.canvas-tip { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Custom symbols */
+.preset-slot { position: relative; display: grid; }
+.preset-edit-symbol { position: absolute; right: 4px; bottom: 4px; width: 24px; height: 24px; }
+.preset-edit-symbol .icon { width: 14px; height: 14px; }
+.preset-new { min-height: 64px; border: 1px dashed var(--line); background: transparent; color: var(--secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.preset-new:hover { border-color: var(--accent); color: var(--accent-dark); }
+#symbol-dialog { max-width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.symbol-builder { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: start; margin: 12px 0; }
+.symbol-preview { display: grid; justify-items: center; gap: 2px; padding: 12px 8px; border: 1px solid var(--line); color: var(--accent-dark); }
+.symbol-preview .unit-symbol { width: 96px; height: 61px; }
+.symbol-fields { display: grid; gap: 8px; }
+.symbol-part-picker { min-width: 0; margin: 0 0 12px; padding: 0; border: 0; }
+.symbol-part-picker legend { margin-bottom: 6px; color: var(--secondary); font-size: 13px; }
+.symbol-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.symbol-part { display: grid; justify-items: center; gap: 4px; padding: 6px 4px; border: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; font-size: 11px; line-height: 1.2; text-align: center; cursor: pointer; }
+.symbol-part .unit-symbol { width: 44px; height: 28px; color: #174c55; }
+.symbol-part[aria-pressed="true"] { border-color: var(--accent); background: #e5efed; box-shadow: inset 0 0 0 1px var(--accent); }
+@media (max-width: 480px) { .symbol-builder { grid-template-columns: 1fr; } }
+
+/* Help */
+.help-button { font-weight: 700; }
+.help-dialog { max-width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.help-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.help-heading h2 { margin: 0; }
+.help-body section + section { margin-top: 16px; }
+.help-body h3 { margin: 0 0 6px; font-size: 14px; }
+.help-body ul { margin: 0; padding-left: 18px; }
+.help-body li { margin: 4px 0; font-size: 13px; line-height: 1.5; }
+.help-keys { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 13px; }
+.help-keys dt, .help-keys dd { margin: 0; }
+
+/* English preset names may take two lines instead of being cut off. */
+html[lang="en"] .formation-palette :is(.preset-name, .preset-detail) { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

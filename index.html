@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="assets/hud/fonts.css?v=20261118">
   <link rel="stylesheet" href="assets/hud/pixel-hud.css?v=20261118">
   <link rel="stylesheet" href="assets/styles/hud-editor.css?v=20261118">
+  <script src="src/core/i18n.js?v=20261118" defer></script>
   <script src="src/core/config.js?v=20261118" defer></script>
   <script src="src/data/presets.js?v=20261118" defer></script>
   <script src="src/render/symbols.js?v=20261118" defer></script>
@@ -26,6 +27,8 @@
       <span>兵牌编辑器</span>
     </div>
     <div class="topbar-actions">
+      <button class="icon-button hud-icon-btn help-button" id="open-help" type="button" aria-label="使用说明" title="使用说明">?</button>
+      <button class="button secondary hud-btn language-toggle" id="language-toggle" type="button"></button>
       <div class="history" aria-label="编辑历史">
         <button class="icon-button hud-icon-btn" id="undo" data-icon="undo" aria-label="撤销" title="撤销（⌘ / Ctrl + Z）"></button>
         <button class="icon-button hud-icon-btn" id="redo" data-icon="redo" aria-label="重做" title="重做（⌘ / Ctrl + Shift + Z）"></button>
@@ -240,6 +243,102 @@
         <button type="submit" class="button primary hud-btn is-solid">保存预设</button>
       </div>
     </form>
+  </dialog>
+  <dialog class="hud-dialog" id="symbol-dialog" aria-labelledby="symbol-dialog-title">
+    <form id="symbol-form">
+      <h2 id="symbol-dialog-title">自定义标识</h2>
+      <p>组合北约标识图形，可加入最多 4 个字符的文字。保存后作为新兵种，可用于兵牌、单位属性和预设。</p>
+      <div class="symbol-builder">
+        <div class="symbol-preview" id="symbol-preview" aria-hidden="true"></div>
+        <div class="symbol-fields">
+          <label>名称<input id="symbol-name" maxlength="24" required autocomplete="off" placeholder="如宪兵、无人机"></label>
+          <div class="preset-form-grid">
+            <label>文字<input id="symbol-text" maxlength="4" autocomplete="off" placeholder="如 MP"></label>
+            <label>文字位置<select id="symbol-text-position"><option value="center">居中</option><option value="top">上方</option><option value="bottom">下方</option></select></label>
+          </div>
+          <label>默认级别<select id="symbol-rank"></select></label>
+        </div>
+      </div>
+      <fieldset class="symbol-part-picker">
+        <legend>图形组件</legend>
+        <div id="symbol-parts" class="symbol-parts"></div>
+      </fieldset>
+      <p id="symbol-error" class="dialog-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="button delete-button hud-btn" id="delete-symbol" hidden>删除标识</button>
+        <button type="button" class="button secondary hud-btn" id="cancel-symbol">取消</button>
+        <button type="submit" class="button primary hud-btn is-solid">保存标识</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="hud-dialog help-dialog" id="help-dialog" aria-labelledby="help-title">
+    <div class="help-heading"><h2 id="help-title">使用说明</h2><button type="button" class="button secondary hud-btn" id="close-help">关闭</button></div>
+    <div class="help-body">
+      <section>
+        <h3>搭建编制</h3>
+        <ul>
+          <li>从右侧「兵牌预设」拖动兵牌到画布，或点击后再点画布放置；按 Enter 放在画布中央。</li>
+          <li>放到空白处建立独立单位，放到已有兵牌上编入它的下级。</li>
+          <li>「编制预设」带完整的下级编成；「兵种兵牌」只按默认级别带基础编制。</li>
+          <li>选中兵牌后在「单位属性」中修改名称、兵种、级别和上级。</li>
+          <li>拖动兵牌调整位置；拖到另一枚兵牌上则改编为它的下级。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>展开、折叠与叠牌</h3>
+        <ul>
+          <li>大型编制默认折叠。用「展开一层」「叠起一层」「全部展开」逐层查看，或在单位属性中展开某一分支。</li>
+          <li>「叠放同类」把同一上级下相同的单位叠成一枚兵牌；选中叠牌后可在单位属性中展开。</li>
+          <li>「锁定展开状态」会保留该分支当前的展开、折叠和叠牌，不受整体操作影响。</li>
+          <li>右键或按菜单键打开兵牌的快捷操作。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>人数与装备</h3>
+        <ul>
+          <li>上级人数由下级自动汇总；基层单位需要填写固定人数。</li>
+          <li>指挥部可编辑本部岗位，岗位人数单独计入。</li>
+          <li>坦克、火炮、卡车等单件装备的乘员配置在兵牌内，不另建下级。</li>
+          <li>标有「推定」的人数或编成是估算或示例，不是史料记载。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>预设</h3>
+        <ul>
+          <li>「管理预设」中的整套编制可一键新建为编制，也可编辑；「保存当前编制」把当前图存为整套预设。</li>
+          <li>右键单击编制预设可编辑它的下级组成和人数，修改只影响之后放置的兵牌。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>自定义标识</h3>
+        <ul>
+          <li>在「兵种兵牌」中点击「新建标识」，组合图形组件并加入文字，即可建立新的兵种。</li>
+          <li>自定义兵种出现在兵牌库、单位属性和预设的兵种列表中，拖入时按默认级别带基础编制。</li>
+          <li>点击兵牌右下角的编辑按钮修改标识；删除后，使用它的单位改为通用兵牌。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>视图、保存与导出</h3>
+        <ul>
+          <li>「平面」与「2.5D」只改变显示，不修改编制。「整理布局」重新排列兵牌。</li>
+          <li>「保存图片」导出当前可见的编制图为 SVG。</li>
+          <li>所有编制、预设和自定义标识只保存在当前浏览器中，清除浏览器数据会丢失。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>快捷键</h3>
+        <dl class="help-keys">
+          <dt><kbd>⌘ / Ctrl + Z</kbd></dt><dd>撤销</dd>
+          <dt><kbd>⌘ / Ctrl + Shift + Z</kbd></dt><dd>重做</dd>
+          <dt><kbd>V</kbd></dt><dd>选择工具</dd>
+          <dt><kbd>H</kbd></dt><dd>平移工具</dd>
+          <dt><kbd>空格</kbd></dt><dd>按住临时平移</dd>
+          <dt><kbd>F</kbd></dt><dd>适应画布</dd>
+          <dt><kbd>Delete</kbd></dt><dd>删除选中单位</dd>
+          <dt><kbd>Esc</kbd></dt><dd>取消放置</dd>
+        </dl>
+      </section>
+    </div>
   </dialog>
   <div id="unit-context-menu" class="unit-context-menu hud-menu" role="menu" hidden></div>
   <div id="unit-tooltip" class="unit-tooltip hud-panel" role="tooltip" hidden></div>
